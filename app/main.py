@@ -68,5 +68,18 @@ def main(argv=None) -> int:
     return rc
 
 
+def _fatal_guard(argv) -> int:
+    try:
+        return main(argv)
+    except Exception as exc:
+        try:
+            from PySide6.QtWidgets import QApplication, QMessageBox
+            a = QApplication.instance() or QApplication(sys.argv)
+            QMessageBox.critical(None, "Douyin Downloader", str(exc))
+        except Exception:
+            pass
+        return 1
+
+
 if __name__ == "__main__":
     raise SystemExit(main())
