@@ -1,0 +1,32 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    ports:
+      - "8000:8000" # debug truc tiep API (trang web dung qua /api/ o cong 8080)
+    volumes:
+      - ./downloads:/app/Downloaded
+      - ./api/config.yml:/app/config.yml:ro
+      - ./aliases.json:/app/aliases.json:ro
+    restart: unless-stopped
+
+  web:
+    build: ./web
+    ports:
+      - "8080:80"
+    volumes:
+      - ./downloads:/downloads:ro
+    depends_on:
+      - api
+      - gallery
+    restart: unless-stopped
+
+  gallery:
+    build: ./gallery
+    ports:
+      - "8001:8001" # mo port rieng de Docker Desktop hien nut ↗ nhu immich_server
+    volumes:
+      - ./downloads:/downloads:ro
+      - ./aliases.json:/aliases.json:ro
+    restart: unless-stopped

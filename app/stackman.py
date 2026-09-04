@@ -51,6 +51,7 @@ class StackManager:
         subjects = str(Path(self.stack_dir) / "subjects.json")
         cfg = str(Path(self.stack_dir) / "api" / "config.native.yml")
         base_env = {"PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1",
+                    "DOUYIN_PATH": dl,
                     "DL_DIR": dl, "ALIAS_PATH": aliases, "SUBJECTS_PATH": subjects}
         return [
             Service("api", 8000, str(Path(self.stack_dir) / "downloader"),
@@ -68,6 +69,11 @@ class StackManager:
         out = {}
         logs = Path(self.logs_dir)
         logs.mkdir(parents=True, exist_ok=True)
+        cfg = Path(self.stack_dir) / "api" / "config.native.yml"
+        if not cfg.is_file():
+            raise RuntimeError(
+                "thieu api/config.native.yml — copy api/config.native.example.yml "
+                "thành config.native.yml rồi điền cookie (xem README).")
         for s in self.services():
             if port_open(s.port):
                 out[s.name] = "dang chay san"

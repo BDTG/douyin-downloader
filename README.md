@@ -4,11 +4,16 @@ App tải video/ảnh Douyin chất lượng gốc theo user — chạy độc l
 không cần framework. Engine Python trong `--stack-dir`,
 UI Qt (PySide6) gọi thẳng HTTP, Gallery/Tracker/Files vẫn là web.
 
-## Chạy
+## Chạy lần đầu (engine trong repo)
 
 ```bat
-:: venv: uv venv --python 3.11 .venv && uv pip install --python .venv/Scripts/python.exe -r requirements.txt
-.venv\Scripts\python.exe -m app --stack-dir D:\ThucTap\douyin-docker
+:: 1. venv app
+uv venv --python 3.11 .venv && uv pip install --python .venv/Scripts/python.exe -r requirements.txt
+:: 2. venv engine (1 lần)
+uv venv --python 3.11 engine/.venv && uv pip install --python engine/.venv/Scripts/python.exe -r engine/downloader/requirements.txt fastapi "uvicorn[standard]"
+:: 3. cookie: copy engine/api/config.native.example.yml -> engine/api/config.native.yml, điền 5 keys
+:: 4. chạy
+.venv\Scripts\python.exe -m app
 ```
 
 Mở app là tự bật stack (api:8000/gallery:8001/web:8080, port bận thì dùng luôn),

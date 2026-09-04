@@ -1,0 +1,25 @@
+# Config toi thieu cho server mode trong Docker.
+# Muon tai on dinh hon -> dien cookies lay tu trinh duyet (xem README muc 3).
+link: []
+path: D:/ThucTap/douyin-docker/downloads/
+mode:
+- post
+number:
+  post: 0
+thread: 5
+retry_times: 3
+video_quality: original # ban goc (to gap nhieu lan ban highest), nhu ttget
+proxy: ""
+database: true
+database_path: D:/ThucTap/douyin-docker/downloads/dy_downloader.db # de gallery doc duoc metadata
+author_dir: "sec_uid" # thu muc theo ID on dinh + hien code name qua aliases.json (gallery)
+progress:
+  quiet_logs: true
+cookies:
+  msToken: ""
+  ttwid: ""
+  odin_tt: ""
+  passport_csrf_token: ""
+  sid_guard: ""
+browser_fallback:
+  enabled: false

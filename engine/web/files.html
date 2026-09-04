@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Files — Douyin đã tải</title>
+<style>
+:root{--fg:#e8e8e8;--muted:#9a9a9a;--acc:#2e75b6;--bd:#2b2b2b;--card:#161616}
+*{box-sizing:border-box}
+body{background:#111;color:var(--fg);font-family:'Segoe UI',Consolas,monospace;font-size:14px;max-width:1000px;margin:0 auto;padding:12px}
+a{color:#6db3f2;text-decoration:none}
+header.top{position:sticky;top:0;z-index:20;background:rgba(17,17,17,.96);padding:10px 0 8px;border-bottom:1px solid var(--bd)}
+h1{font-size:18px;margin:0 0 2px}h1 small{color:var(--muted);font-weight:normal;font-size:12px}
+.links{font-size:12px;margin-bottom:8px}
+input{background:#0e0e0e;color:var(--fg);border:1px solid var(--bd);border-radius:6px;padding:7px 10px;font-size:13px;width:100%;margin-top:8px}
+h2.u{display:flex;align-items:center;gap:10px;font-size:15px;margin:20px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--bd)}
+.avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#2e75b6,#6db3f2);display:flex;align-items:center;justify-content:center;font-weight:bold;color:#fff;flex:none}
+h2.u small{color:var(--muted);font-weight:normal;font-size:12px;margin-left:auto}
+table{width:100%;border-collapse:collapse;background:var(--card);border-radius:10px;overflow:hidden;margin-bottom:6px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--bd);font-size:13px;vertical-align:middle}
+th{background:#1c1c1c;color:#fff;font-size:12px}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#1a1a1a}
+td.n{word-break:break-all}
+td.num{white-space:nowrap;color:var(--muted);font-size:12px}
+.ic{font-size:16px;margin-right:6px}
+.empty{color:var(--muted);padding:40px 0;text-align:center}
+.crumb{font-size:12px;color:var(--muted);margin:10px 0}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>📁 Files <small id="cnt"></small></h1>
+  <div class="links"><a href="/tracker.html">← Tracker</a> &nbsp; <a href="/gallery/">🖼 Gallery</a></div>
+  <input id="q" placeholder="🔍 Tìm tên file / tiêu đề..." oninput="render()">
+</header>
+<div class="crumb">/downloads — file tải bản gốc, bấm tên để xem, ⬇ để tải về</div>
+<div id="out"><p class="empty">Đang tải...</p></div>
+<script>
+let DATA={users:{},display:{}};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const MB=b=>b>1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Math.round(b/1024))+' KB';
+async function load(){
+  const r=await fetch('/gallery/api/files');DATA=await r.json();
+  let n=0,bytes=0;
+  for(const items of Object.values(DATA.users))items.forEach(it=>{n++;bytes+=it.size||0;});
+  $('cnt').textContent='— '+n+' file · '+(bytes/1073741824).toFixed(2)+' GB';
+  render();
+}
+function render(){
+  const q=$('q').value.toLowerCase(),out=$('out');let html='';
+  for(const u of Object.keys(DATA.users).sort()){
+    const dd=(DATA.display||{})[u]||{},label=dd.code||u;
+    const list=[...DATA.users[u]].sort((a,b)=>b.mtime-a.mtime)
+      .filter(it=>!q||(it.name+' '+(it.title||'')).toLowerCase().includes(q));
+    if(!list.length)continue;
+    const sub=(dd.nick&&dd.nick!==label)?` <small style="color:var(--muted)">(${esc(dd.nick)})</small>`:'';
+    const mb=list.reduce((s,it)=>s+(it.size||0),0);
+    html+=`<h2 class="u"><span class="avatar">${esc(label.trim()[0]||'?')}</span>${esc(label)}${sub}<small>${list.length} file · ${MB(mb)}</small></h2>`;
+    html+=`<table><thead><tr><th>Tên file</th><th>Ngày</th><th>Dung lượng</th><th></th></tr></thead><tbody>`;
+    list.forEach(it=>{
+      const url='/gallery/api/file?path='+encodeURIComponent(it.path);
+      const ic=it.kind==='video'?'🎬':'🖼️';
+      const dt=it.date||new Date(it.mtime*1000).toISOString().slice(0,10);
+      html+=`<tr><td class="n"><span class="ic">${ic}</span><a href="${url}" target="_blank">${esc(it.title||it.name)}</a><br><small style="color:var(--muted)">${esc(it.name)}</small></td><td class="num">${esc(dt)}</td><td class="num">${MB(it.size)}</td><td class="num"><a href="${url}" download>⬇</a></td></tr>`;
+    });
+    html+='</tbody></table>';
+  }
+  out.innerHTML=html||'<p class="empty">Không có file nào khớp.</p>';
+}
+load();
+</script>
+</body>
+</html>

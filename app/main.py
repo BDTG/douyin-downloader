@@ -42,9 +42,18 @@ def build_app(stack_dir: str):
     return app, win, stack
 
 
+def _default_stack() -> str:
+    here = Path(__file__).resolve()
+    cands = [here.parents[1] / "engine", Path("D:/ThucTap/douyin-docker")]
+    for c in cands:
+        if (c / "api").is_dir():
+            return str(c)
+    return str(cands[0])
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Douyin Downloader (standalone)")
-    ap.add_argument("--stack-dir", default="D:/ThucTap/douyin-docker")
+    ap.add_argument("--stack-dir", default=_default_stack())
     args = ap.parse_args(argv)
     if not Path(args.stack_dir).is_dir():
         print(f"khong thay stack dir: {args.stack_dir}", file=sys.stderr)

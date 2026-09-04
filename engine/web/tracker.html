@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Douyin Tracker — DB + Quét link</title>
+<style>
+:root{
+  --fg: var(--foreground, #e8e8e8);
+  --muted: var(--muted-foreground, #9a9a9a);
+  --acc: var(--accent, #2e75b6);
+  --bd: var(--border, #333);
+  --card: var(--card, #161616);
+  --green: #4caf7d; --yellow: #d9a441; --red: #d9534f;
+}
+*{box-sizing:border-box}
+body{color:var(--fg);background:#111;font-family:Consolas,'Segoe UI',monospace;font-size:14px;max-width:1100px;padding:12px}
+h1{font-size:20px;margin:4px 0}
+.sub{color:var(--muted);font-size:12px;margin-bottom:12px}
+.tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.tabs button{background:var(--card);color:var(--fg);border:1px solid var(--bd);padding:7px 14px;cursor:pointer;border-radius:6px}
+.tabs button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.panel{display:none}.panel.on{display:block}
+table{width:100%;border-collapse:collapse;background:var(--card)}
+th,td{border:1px solid var(--bd);padding:6px 8px;text-align:left;vertical-align:top}
+th{background:#1f4e78;color:#fff;font-size:12px}
+tr.done td{background:rgba(76,175,125,.12)}
+a{color:#6db3f2;word-break:break-all}
+.sub a{white-space:nowrap}
+input,select,textarea{background:#0e0e0e;color:var(--fg);border:1px solid var(--bd);border-radius:4px;padding:6px;width:100%}
+button.act{background:var(--acc);color:#fff;border:none;padding:7px 12px;border-radius:5px;cursor:pointer;margin:2px}
+button.ghost{background:transparent;border:1px solid var(--bd);color:var(--fg);padding:6px 10px;border-radius:5px;cursor:pointer;margin:2px}
+button.danger{background:transparent;border:1px solid var(--red);color:var(--red);padding:4px 8px;border-radius:5px;cursor:pointer}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.row>*{flex:1;min-width:150px}
+.stat{display:inline-block;background:var(--card);border:1px solid var(--bd);border-radius:6px;padding:8px 14px;margin:2px;font-size:13px}
+.stat b{font-size:18px}
+.pill{display:inline-block;padding:2px 10px;border-radius:10px;font-size:12px;cursor:pointer;user-select:none}
+.pill.y{background:rgba(217,164,65,.2);color:var(--yellow);border:1px solid var(--yellow)}
+.pill.g{background:rgba(76,175,125,.2);color:var(--green);border:1px solid var(--green)}
+.tier{display:inline-block;min-width:26px;text-align:center;font-weight:bold;font-size:12px;border-radius:6px;padding:1px 7px;background:#3a3a3a;color:#ccc;white-space:nowrap}
+.tier.sx{background:linear-gradient(135deg,#c9a227,#ff6b6b);color:#fff}
+textarea#bulk{height:120px;font-size:12px}
+.small{font-size:12px;color:var(--muted)}
+#scanResult{margin-top:8px}
+</style>
+</head>
+<body>
+<h1>🎬 Douyin Tracker</h1>
+<div class="sub">DB quản lý video theo user + tool quét link &nbsp;|&nbsp; dữ liệu lưu trên trình duyệt (localStorage), Export JSON/CSV để backup &amp; mở bằng Excel &nbsp;|&nbsp; API tải: <b id="apiDot">đang kiểm tra...</b> &nbsp;|&nbsp; <a href="/files/" target="_blank">📁 Files đã tải</a></div>
+
+<div class="tabs">
+  <button data-tab="scan" class="on">🔍 Quét link</button>
+  <button data-tab="videos">🎞 Videos</button>
+  <button data-tab="users">👤 Users</button>
+  <button data-tab="backup">💾 Backup</button>
+</div>
+
+<!-- SCAN -->
+<div class="panel on" id="p-scan">
+  <p class="small">Dán nhiều link Douyin (mỗi link 1 dòng) → <b>1. Quét link</b> lọc trùng + <b>tự nhận diện user</b> (~2-3s/link, không cần bấm tay) → <b>3. Thêm vào DB</b> tự chia đúng user. Nút <b>2.</b> chỉ để bấm lại khi mạng lỗi.</p>
+  <textarea id="bulk" placeholder="https://www.douyin.com/video/7123...&#10;https://v.douyin.com/abcXYZ/&#10;https://www.douyin.com/user/MS4w..."></textarea>
+  <div class="row">
+    <select id="bulkUser" title="User sở hữu các link này"></select>
+    <input id="bulkFolder" placeholder="Thư mục lưu (vd D:\Douyin\XYY) — tự điền Location mẫu">
+  </div>
+  <button class="act" onclick="scanLinks()">1. Quét link</button>
+  <button class="act" onclick="resolveAuthors()" id="btnResolve" disabled>2. Nhận diện user</button>
+  <button class="act" onclick="addScanned()" id="btnAdd" disabled>3. Thêm vào DB</button>
+  <div id="scanResult"></div>
+</div>
+
+<!-- VIDEOS -->
+<div class="panel" id="p-videos">
+  <div id="stats"></div>
+  <div class="row">
+    <select id="fUser" onchange="renderVideos()"><option value="">— Lọc user: tất cả —</option></select>
+    <select id="fStatus" onchange="renderVideos()">
+      <option value="">— Trạng thái: tất cả —</option>
+      <option value="Chưa tải">Chưa tải</option>
+      <option value="Đã tải">Đã tải</option>
+    </select>
+    <input id="fSearch" placeholder="Tìm link / location / ghi chú..." oninput="renderVideos()">
+  </div>
+  <div class="row">
+    <select id="nUser"></select>
+    <input id="nLink" placeholder="Link video...">
+    <input id="nLoc" placeholder="Location trên máy...">
+    <input id="nNote" placeholder="Ghi chú...">
+  </div>
+  <button class="act" onclick="addVideo()">+ Thêm video</button>
+  <button class="ghost" onclick="backfillSpecs()" id="btnSpec" title="Hoi server lay thoi luong/phân giải/luot xem cho video cu (chua co thong so)">📊 Bổ sung thông số</button>
+  <button class="ghost" onclick="dlAll()">⬇ Tải hết (chưa tải)</button>
+  <table><thead><tr><th>#</th><th>User</th><th>Link video</th><th>Đã tải?</th><th>Thông số</th><th>Location</th><th>Ngày tải</th><th>Ghi chú</th><th>Tải</th><th></th></tr></thead>
+  <tbody id="videoRows"></tbody></table>
+</div>
+
+<!-- USERS -->
+<div class="panel" id="p-users">
+  <div class="row">
+    <input id="uName" placeholder="Tên user (vd XYY)">
+    <input id="uLink" placeholder="Link user">
+    <input id="uFolder" placeholder="Thư mục lưu (vd D:\Douyin\XYY)">
+  </div>
+  <button class="act" onclick="addUser()">+ Thêm user</button>
+  <table><thead><tr><th>#</th><th>User</th><th>Tier</th><th>Link user</th><th>Thư mục</th><th>Tổng</th><th>Đã tải</th><th>Chưa tải</th><th></th></tr></thead>
+  <tbody id="userRows"></tbody></table>
+</div>
+
+<!-- BACKUP -->
+<div class="panel" id="p-backup">
+  <button class="act" onclick="exportJSON()">⬇ Export JSON</button>
+  <button class="act" onclick="exportCSV()">⬇ Export CSV (mở bằng Excel)</button>
+  <button class="ghost" onclick="document.getElementById('imp').click()">⬆ Import JSON</button>
+  <input type="file" id="imp" accept=".json" style="display:none" onchange="importJSON(this)">
+  <button class="danger" onclick="if(confirm('Xóa HẾT dữ liệu?')){localStorage.removeItem(KEY);location.reload()}">Xóa hết DB</button>
+  <p class="small">CSV xuất ra khớp cột file Douyin.ods: User | Link video | Đã tải | Location | Ngày tải | Ghi chú.</p>
+</div>
+
+<script>
+const KEY='douyin_tracker_v1';
+let DB;
+try{DB=JSON.parse(localStorage.getItem(KEY))||null}catch(e){DB=null}
+if(!DB||!DB.users){DB={users:[],videos:[]};save();}
+function save(){localStorage.setItem(KEY,JSON.stringify(DB));}
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* tabs */
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');$('p-'+b.dataset.tab).classList.add('on');
+});
+
+/* ---- link parser (tool quét) ---- */
+function parseLink(raw){
+  const u=String(raw).match(/https?:\/\/[^\s"'<>]+/);
+  const link=(u?u[0]:String(raw)).trim().replace(/[.,;!)]+$/,'');
+  if(!link) return null;
+  let m=link.match(/douyin\.com\/video\/(\d+)/);
+  if(m) return {link,type:'video',id:m[1]};
+  m=link.match(/v\.douyin\.com\/([A-Za-z0-9_-]+)/);
+  if(m) return {link,type:'video (link rút gọn)',id:m[1]};
+  m=link.match(/douyin\.com\/user\/([^/?#]+)/);
+  if(m) return {link,type:'trang user',id:m[1]};
+  m=link.match(/douyin\.com\/note\/(\d+)/);
+  if(m) return {link,type:'note/ảnh',id:m[1]};
+  return /douyin\.com/.test(link)?{link,type:'douyin (loại khác)',id:'-'}:{link,type:'❌ không phải link Douyin',id:'-'};
+}
+let scanned=[];
+function renderScan(msg){
+  const nv=scanned.filter(s=>!s.dup&&(s.type.startsWith('video')||s.type.startsWith('note'))).length;
+  let html='<table><thead><tr><th>Link</th><th>Loai</th><th>ID</th><th>User (nhan dien)</th><th>Thong so</th><th>Trung?</th></tr></thead><tbody>';
+  scanned.forEach(s=>{
+    let u;
+    if(s.author_code){u='<b>'+esc(s.author_code)+'</b>'+(s.author_nick?' <span class="small">('+esc(s.author_nick)+')</span>':'');}
+    else if(s.author_nick){u=esc(s.author_nick);}
+    else if(s.resolving){u='dang hoi...';}
+    else{u='<span class="small">- bam buoc 2 -</span>';}
+    let spec=(s.media_type==='gallery'?'[anh] ':'')+(s.spec?esc(s.spec):(s.resolving?'...':'<span class="small">-</span>'));
+    html+='<tr><td><a href="'+esc(s.link)+'" target="_blank">'+esc(s.link)+'</a>'+(s.desc?'<br><span class="small">'+esc(s.desc)+'</span>':'')+'</td><td>'+esc(s.type)+'</td><td>'+esc(s.aweme_id||s.id)+'</td><td>'+u+'</td><td><span class="small">'+spec+'</span></td><td>'+(s.dup?'da co trong DB':'moi')+'</td></tr>';
+  });
+  html+='</tbody></table><p class="small">Them moi: <b>'+nv+'</b> video (bo link trung + link khong phai video).'+(msg||'')+'</p>';
+  $('scanResult').innerHTML=html;
+  $('btnAdd').disabled=nv===0;
+  $('btnResolve').disabled=nv===0;
+}
+function scanLinks(){
+  const urls=($('bulk').value.match(/https?:\/\/[^\s\"'<>]+/g)||[]).map(s=>s.replace(/[.,;!)]+$/,''));
+  const seen=new Set(DB.videos.map(v=>v.link));
+  const seenIds=new Set(DB.videos.map(v=>{const pp=parseLink(v.link);return pp?pp.id:'';}).filter(x=>x&&x!=='-'));
+  scanned=urls.map(parseLink).filter(Boolean).map(p=>({link:p.link,type:p.type,id:p.id,dup:seen.has(p.link)||(p.id!=='-'&&seenIds.has(p.id)),author_code:'',author_nick:'',author_sec_uid:'',aweme_id:'',desc:'',spec:'',resolving:false}));
+  if(!scanned.length){$('scanResult').innerHTML='<p class="small">Chua co link nao.</p>';$('btnAdd').disabled=true;$('btnResolve').disabled=true;return;}
+  renderScan();
+  // tu dong hoi server nhan dien user ngay sau khi quet (khong can bam tay); mo file truc tiep (file://) thi bo qua
+  try{if(location.protocol.indexOf('http')===0){resolveAuthors();}}catch(_){}
+}
+async function resolveAuthors(){
+  if(!scanned.length){$('scanResult').innerHTML='<p>Chua quet link nao - bam <b>1. Quet link</b> truoc.</p>';return;}
+  const todo=scanned.filter(s=>!s.dup&&(s.type.indexOf('video')===0||s.type.indexOf('note')===0)&&!s.author_nick&&!s.resolving);
+  if(!todo.length){
+    const ndup=scanned.filter(s=>!s.dup&&(s.type.indexOf('video')===0||s.type.indexOf('note')===0)).length;
+    let why = ndup===0 ? 'toan bo link da trung DB hoac khong phai link video (xem cot Trung?). Xoa link trung khoi DB hoac dan link moi.' : 'cac link da duoc nhan dien roi (cot User da co ten). Bam <b>3. Them vao DB</b>.';
+    $('scanResult').innerHTML='<p>Khong co gi de nhan dien: '+why+'</p>';return;
+  }
+  $('btnResolve').disabled=true;
+  let ok=0;
+  for(let k=0;k<todo.length;k++){
+    const s=todo[k];
+    s.resolving=true;renderScan(' - dang nhan dien '+(ok+1)+'/'+todo.length+'...');
+    try{
+      const r=await api('/api/v1/resolve',{method:'POST',body:JSON.stringify({url:s.link})});
+      s.aweme_id=r.aweme_id||s.id; s.author_nick=r.author_nickname||''; s.author_sec_uid=r.author_sec_uid||'';
+      s.author_code=r.code||''; s.desc=r.desc||''; s.spec=r.spec||''; s.media_type=r.media_type||''; if(r.image_count)s.spec=s.spec;
+      if(r.author_nickname)ok++;
+      if(!r.author_nickname)s.desc=r.error||'khong lay duoc ten (cookie het han?)';
+    }catch(e){s.desc='loi goi API: '+e.message;}
+    s.resolving=false;
+  }
+  renderScan(' - nhan dien duoc <b>'+ok+'/'+todo.length+'</b> link.');
+  $('btnResolve').disabled=false;
+}
+window.addEventListener('error',e=>{try{const el=$('scanResult');if(el&&String(e.message||'').indexOf('resolveAuthors')>=0)el.innerHTML='<p>Loi JS: '+esc(e.message)+'</p>';}catch(_){}});
+function addScanned(){
+  const fallback=$('bulkUser').value||'', folder=$('bulkFolder').value.trim();
+  const seen=new Set(DB.videos.map(v=>v.link)); let n=0; const newUsers=[];
+  scanned.forEach(s=>{
+    if(s.dup||(s.type.indexOf('video')!==0&&s.type.indexOf('note')!==0)||seen.has(s.link))return;
+    const user=s.author_code||s.author_nick||fallback||'(chua ro user)';
+    if((s.author_code||s.author_nick)&&!DB.users.some(u=>u.name===user)){
+      let f=folder?folder+'\\\\':('downloads/'+(s.author_sec_uid||user)+'/');
+      let note='tu tao khi quet'+(s.author_nick&&s.author_code?(' ('+s.author_nick+')'):'');
+      let lk=s.author_sec_uid?('https://www.douyin.com/user/'+s.author_sec_uid):'';
+      DB.users.push({name:user,link:lk,folder:f,note:note});
+      newUsers.push(user);
+    }
+    DB.videos.push({user:user,link:s.link,done:false,location:folder?folder+'\\\\':'',date:'',note:('ID:'+(s.aweme_id||s.id))+(s.spec?(' | '+s.spec):'')+(s.desc?(' | '+s.desc):'')});
+    seen.add(s.link);n++;
+  });
+  save();refresh();
+  let msg='<p>Da them <b>'+n+'</b> video';
+  if(newUsers.length)msg+=' - user moi: <b>'+newUsers.map(esc).join(', ')+'</b>';
+  else msg+=' (dung user: <b>'+esc(fallback||'theo nhan dien')+'</b>)';
+  msg+=' (trang thai Chua tai).</p>';
+  $('scanResult').innerHTML=msg;
+  $('btnAdd').disabled=true;$('btnResolve').disabled=true;$('bulk').value='';
+}
+
+/* ---- CRUD ---- */
+function addUser(){
+  const name=$('uName').value.trim(); if(!name){alert('Nhập tên user');return;}
+  if(DB.users.some(u=>u.name===name)){alert('User đã tồn tại');return;}
+  DB.users.push({name,link:$('uLink').value.trim(),folder:$('uFolder').value.trim(),note:''});
+  $('uName').value=$('uLink').value=$('uFolder').value=''; save();refresh();
+}
+function delUser(i){if(confirm('Xóa user '+DB.users[i].name+'? (video giữ lại)')){DB.users.splice(i,1);save();refresh();}}
+function addVideo(){
+  const link=$('nLink').value.trim(); if(!link){alert('Nhập link video');return;}
+  if(DB.videos.some(v=>v.link===link)){alert('Link đã có trong DB');return;}
+  DB.videos.push({user:$('nUser').value,link,done:false,location:$('nLoc').value.trim(),date:'',note:$('nNote').value.trim()});
+  $('nLink').value=$('nLoc').value=$('nNote').value=''; save();refresh();
+}
+function specOf(note){
+  const m=String(note||'').match(/((?:\d+ anh|[\d.]+s) \|[^|]*(?:\|[^|]*){0,3})/);
+  return m?m[1].trim():'';
+}
+function toggleDone(i){const v=DB.videos[i];v.done=!v.done;v.date=v.done?new Date().toISOString().slice(0,10):'';save();renderVideos();renderStats();}
+function delVideo(i){if(confirm('Xóa dòng này?')){DB.videos.splice(i,1);save();refresh();}}
+function editLoc(i,val){DB.videos[i].location=val;save();}
+function editNote(i,val){DB.videos[i].note=val;save();}
+
+/* ---- render ---- */
+function userOpts(sel,keep,emptyLabel){
+  const cur=keep??sel.value;
+  sel.innerHTML=(emptyLabel?`<option value="">${emptyLabel}</option>`:'')+DB.users.map(u=>`<option>${esc(u.name)}</option>`).join('');
+  if([...sel.options].some(o=>o.value===cur))sel.value=cur;
+  else sel.value=emptyLabel?'':(sel.options[0]?sel.options[0].value:'');
+}
+function renderUsers(){
+  $('userRows').innerHTML=DB.users.map((u,i)=>{
+    const vs=DB.videos.filter(v=>v.user===u.name), d=vs.filter(v=>v.done).length;
+    return `<tr><td>${i+1}</td><td><b>${esc(u.name)}</b></td><td>${tierBadge(u.name)}</td><td><a href="${esc(u.link)}" target="_blank">${esc(u.link)}</a></td><td>${esc(u.folder)}</td><td>${vs.length}</td><td>${d}</td><td>${vs.length-d}</td><td><button class="danger" onclick="delUser(${i})">xóa</button></td></tr>`;
+  }).join('');
+}
+function renderVideos(){
+  const fu=$('fUser').value, fs=$('fStatus').value, q=$('fSearch').value.toLowerCase();
+  let idx=0;
+  $('videoRows').innerHTML=DB.videos.map((v,i)=>{
+    if(fu&&v.user!==fu)return ''; if(fs&&(v.done?'Đã tải':'Chưa tải')!==fs)return '';
+    if(q&&!(v.link+' '+(v.location||'')+' '+(v.note||'')).toLowerCase().includes(q))return '';
+    idx++;
+    return `<tr class="${v.done?'done':''}"><td>${idx}</td><td>${esc(v.user)}</td><td><a href="${esc(v.link)}" target="_blank">${esc(v.link)}</a></td>
+    <td><span class="pill ${v.done?'g':'y'}" title="Chỉ đánh dấu thủ công — KHÔNG tải file" onclick="toggleDone(${i})">${v.done?'Đã tải':'Chưa tải'}</span></td>
+    <td><small>${esc(specOf(v.note)||'—')}</small></td>
+    <td><input value="${esc(v.location||'')}" onchange="editLoc(${i},this.value)" placeholder="đường dẫn file..."></td>
+    <td>${v.date||''}</td><td><input value="${esc(v.note||'')}" onchange="editNote(${i},this.value)"></td>
+    <td><button class="ghost" id="dl-${i}" title="Tải file thật qua server Docker" onclick="dlVideo(${i})">⬇ Tải</button></td>
+    <td><button class="danger" onclick="delVideo(${i})">xóa</button></td></tr>`;
+  }).join('');
+}
+function renderStats(){
+  const t=DB.videos.length,d=DB.videos.filter(v=>v.done).length;
+  $('stats').innerHTML=`<span class="stat">Tổng video<br><b>${t}</b></span><span class="stat">Đã tải<br><b style="color:var(--green)">${d}</b></span><span class="stat">Chưa tải<br><b style="color:var(--yellow)">${t-d}</b></span>`+
+    DB.users.map(u=>{const vs=DB.videos.filter(v=>v.user===u.name),dd=vs.filter(v=>v.done).length;return `<span class="stat">${esc(u.name)}<br><b>${dd}/${vs.length}</b></span>`;}).join('');
+}
+function refresh(){
+  userOpts($('nUser'));userOpts($('bulkUser'),undefined,'— để trống (tự nhận diện khi tải) —');userOpts($('fUser'),$('fUser').value||'');
+  if(!$('fUser').querySelector('option[value=""]'))$('fUser').insertAdjacentHTML('afterbegin','<option value="">— Lọc user: tất cả —</option>');
+  $('fUser').value='';
+  const f=DB.users[0]?DB.users[0].folder:''; if(f)$('bulkFolder').placeholder='Thư mục lưu (vd '+f+')';
+  renderUsers();renderVideos();renderStats();loadRanks();
+}
+
+let RANKS={};
+function tierBadge(name){
+  const r=RANKS[name];
+  if(!r)return '<span class="small">-</span>';
+  const sx=r.tier&&r.tier[0]==='S'?' sx':'';
+  const more=r.next_tier?(' <span class="small">'+r.score+'d~'+r.next_tier+'</span>'):'';
+  return '<span class="tier'+sx+'">'+esc(r.tier)+'</span>'+more;
+}
+async function loadRanks(){
+  try{
+    const d=await (await fetch('gallery/api/files')).json();
+    RANKS={};
+    for(const f of Object.keys(d.ranks||{})){
+      const code=((d.display||{})[f]||{}).code||f;
+      RANKS[code]=d.ranks[f];
+    }
+    renderUsers();
+  }catch(e){}
+}
+/* ---- backup ---- */
+function dl(name,content,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);}
+function exportJSON(){dl('douyin-db.json',JSON.stringify(DB,null,2),'application/json');}
+function exportCSV(){
+  const q=s=>'"'+String(s??'').replace(/"/g,'""')+'"';
+  const rows=[['User','Link video','Da tai','Location','Ngay tai','Ghi chu'].join(',')];
+  DB.videos.forEach(v=>rows.push([q(v.user),q(v.link),q(v.done?'Đã tải':'Chưa tải'),q(v.location),q(v.date),q(v.note)].join(',')));
+  dl('douyin-db.csv','\ufeff'+rows.join('\n'),'text/csv');
+}
+function importJSON(el){
+  const f=el.files[0]; if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.users||!d.videos)throw 0;DB=d;save();refresh();alert('Import xong: '+d.videos.length+' video.');}catch(e){alert('File không đúng định dạng.')};el.value='';};
+  r.readAsText(f);
+}
+/* ---- tai video qua API docker (POST /api/v1/download) ---- */
+async function api(path,opt){
+  const r=await fetch(path,{headers:{'Content-Type':'application/json'},...opt});
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  return r.json();
+}
+async function checkApi(){
+  try{await api('/api/v1/health');$('apiDot').textContent='✅ OK';$('apiDot').style.color='var(--green)';}
+  catch(e){$('apiDot').textContent='❌ chưa chạy (docker compose up)';$('apiDot').style.color='var(--red)';}
+}
+async function dlVideo(i){
+  const v=DB.videos[i], btn=document.getElementById('dl-'+i);
+  const clean=((parseLink(v.link)||{}).link||v.link); // tu tach URL sach neu dong luu truoc day dinh ca doan share text
+  try{
+    if(btn){btn.disabled=true;btn.textContent='⏳';}
+    const j=await api('/api/v1/download',{method:'POST',body:JSON.stringify({url:clean})});
+    const t0=Date.now();
+    while(Date.now()-t0<10*60*1000){
+      await new Promise(r=>setTimeout(r,2500));
+      const s=await api('/api/v1/jobs/'+j.job_id);
+      if(s.status==='SUCCESS'||s.status==='FAILED'){
+        if(s.status==='SUCCESS'&&(s.success>0)){
+          v.done=true;v.date=new Date().toISOString().slice(0,10);
+          if(!v.location)v.location='downloads/ (xem 📁 Files)';
+          v.note=((v.note||'')+` [tải OK ${s.success}/${s.total}]`).trim();
+          await autoAssign(v).catch(()=>{});
+          save();renderVideos();renderStats();
+          alert(`✅ Tải xong ${s.success}/${s.total} — file ở Gallery (🖼) hoặc thư mục downloads/`);
+        }else alert('Tải thất bại: '+(s.error||('failed='+s.failed+'/'+s.total))+' — thường do thiếu cookie Douyin (chống bot). Xem README mục 3 để điền cookie rồi thử lại.');
+        break;
+      }
+      if(btn)btn.textContent='⏳ '+s.status;
+    }
+  }catch(e){alert('Không gọi được API tải: '+e.message+' (docker đã chạy chưa?)');}
+  renderVideos();
+}
+/* tu nhan dien tac gia sau khi tai: lay file video moi nhat -> gan user + location that */
+async function autoAssign(v){
+  const d=await (await fetch('gallery/api/files')).json();
+  const vids=[];
+  for(const [folder,items] of Object.entries(d.users||{}))
+    items.forEach(it=>{if(it.kind==='video')vids.push({folder,...it});});
+  if(!vids.length)return;
+  vids.sort((a,b)=>b.mtime-a.mtime);
+  const top=vids[0], code=((d.display||{})[top.folder]||{}).code||top.folder;
+  v.user=code;
+  if(!DB.users.some(u=>u.name===code))
+    DB.users.push({name:code,link:'',folder:'downloads/'+top.folder+'/',note:'tự tạo khi tải'});
+  v.location='downloads/'+top.path;
+}
+async function backfillSpecs(){
+  const need=DB.videos.map((v,i)=>({v,i})).filter(x=>!/(\d+ anh|[\d.]+s) \|/.test(x.v.note||''));
+  if(!need.length){alert('Mọi video đã có thông số rồi.');return;}
+  if(!confirm('Bổ sung thông số cho '+need.length+' video? (~2-3s/link)'))return;
+  const btn=$('btnSpec');let ok=0;
+  for(let k=0;k<need.length;k++){
+    const x=need[k];
+    if(btn)btn.textContent='⏳ '+(k+1)+'/'+need.length;
+    try{
+      const r=await api('/api/v1/resolve',{method:'POST',body:JSON.stringify({url:(parseLink(x.v.link)||{}).link||x.v.link})});
+      let add='';
+      if(r.spec)add+=' | '+r.spec;
+      if(r.author_nickname&&!x.v.user)add+=' | '+r.author_nickname;
+      if(r.desc)add+=' | '+r.desc;
+      if(add){x.v.note=((x.v.note||'')+add).trim();ok++;}
+      if(r.author_nickname&&(x.v.user==='(chưa rõ user)'||x.v.user==='(chua ro user)'))x.v.user=r.code||r.author_nickname;
+    }catch(e){}
+  }
+  save();refresh();
+  if(btn)btn.textContent='📊 Bổ sung thông số';
+  alert('Xong: bổ sung được '+ok+'/'+need.length+' video (xem trong cột Ghi chú).');
+}
+async function dlAll(){
+  const todo=DB.videos.map((v,i)=>({v,i})).filter(x=>!x.v.done);
+  if(!todo.length){alert('Không còn video Chưa tải.');return;}
+  if(!confirm(`Tải tuần tự ${todo.length} video?`))return;
+  for(const x of todo){await dlVideo(x.i);}
+}
+refresh();
+checkApi();
+</script>
+</body>
+</html>

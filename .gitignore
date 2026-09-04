@@ -5,3 +5,12 @@ venv/
 dist/
 build/
 *.log
+# engine runtime (không commit): cookie, downloads, db, venv
+engine/.venv/
+engine/downloads/*
+!engine/downloads/.gitkeep
+engine/logs/*
+engine/api/config.native.yml
+engine/api/config.yml
+engine/api/.cookies.json
+**/*.db
