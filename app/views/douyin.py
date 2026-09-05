@@ -182,9 +182,11 @@ class DouyinPage(QWidget):
 
         self._tick = QTimer(self)
         self._tick.setInterval(5000)
-        self._tick.timeout.connect(self.refresh_status)
+        self._tick.timeout.connect(self._kick_status)
         self._tick.start()
-        self.refresh_status()
+        self._kick_status()
+        self._last_status_txt = ""
+        self._last_running = None
 
     # -- nền --
     def _bg(self, tag: str, fn, *a):
@@ -211,17 +213,28 @@ class DouyinPage(QWidget):
             return self.refresh_status(silent=True)
         self._bg("op", go)
 
+    def _kick_status(self):
+        """Hoi trang thai stack duoi nen (khong block UI thread)."""
+        self._bg("status", lambda: self.sup.call_op(MID, "getStatus", timeout_s=8))
+
+    def _show_status(self, r):
+        d = r.get("data", r) if isinstance(r, dict) else {}
+        parts = [f"{s.get('name')}: {'chạy' if s.get('listening') else 'dừng'}"
+                 for s in d.get("services", [])]
+        txt = "  •  ".join(parts) + f"  •  api: {d.get('api', '?')}"
+        if txt != self._last_status_txt:
+            self.stack_text.setText(txt)
+            self._last_status_txt = txt
+        running = bool(d.get("running"))
+        if running != self._last_running:
+            self.stack_dot.setStyleSheet(
+                f"color: {'#4CAF7D' if running else '#D9534F'}; font-size: 16px;")
+            self._last_running = running
+
     def refresh_status(self, silent=False):
         try:
             r = self.sup.call_op(MID, "getStatus", timeout_s=10)
-            d = r.get("data", r) if isinstance(r, dict) else {}
-            parts = [f"{s.get('name')}: {'chạy' if s.get('listening') else 'dừng'}"
-                     for s in d.get("services", [])]
-            txt = "  •  ".join(parts) + f"  •  api: {d.get('api', '?')}"
-            self.stack_text.setText(txt)
-            running = bool(d.get("running"))
-            self.stack_dot.setStyleSheet(
-                f"color: {'#4CAF7D' if running else '#D9534F'}; font-size: 16px;")
+            self._show_status(r)
         except Exception:
             if not silent:
                 self.stack_text.setText("Stack chưa chạy — bấm ▶ Start.")
@@ -369,7 +382,7 @@ class DouyinPage(QWidget):
                 QDesktopServices.openUrl(payload)
             return
         if tag == "op":
-            self.refresh_status()
+            self._kick_status()
             return
         if tag == "preview":
             if status == "ok":
@@ -380,6 +393,10 @@ class DouyinPage(QWidget):
                     self.preview.setText("Không đọc được preview")
             else:
                 self.preview.setText("Không tải được preview (CDN chặn?)")
+            return
+        if tag == "status":
+            if status == "ok" and isinstance(payload, dict):
+                self._show_status(payload)
             return
         if status != "ok":
             self.msg.setText(f"Lỗi: {payload}")
