@@ -518,7 +518,24 @@ def build_app(config: ConfigLoader) -> FastAPI:
             sid = out.get("author_sec_uid") or ""
             if sid and sid in aliases:
                 out["code"] = aliases[sid]
+            try:
+                from server.viname import hanviet_name
+            except ImportError:
+                from .viname import hanviet_name  # type: ignore
+            try:
+                out["name_vi"] = hanviet_name(out.get("author_nickname") or "").get("hanviet", "")
+            except Exception:
+                out["name_vi"] = ""
             return out
+
+    @app.get("/api/v1/viname")
+    async def viname(name: str = "") -> Dict[str, Any]:
+        """Dich nickname Trung -> am Han-Viet (offline, kem ten Trung goc)."""
+        try:
+            from server.viname import hanviet_name
+        except ImportError:
+            from .viname import hanviet_name  # type: ignore
+        return hanviet_name(name)
 
     @app.post("/api/v1/download_images")
     async def download_images(req: DownloadImagesRequest) -> Dict[str, Any]:

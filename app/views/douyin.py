@@ -434,7 +434,11 @@ class DouyinPage(QWidget):
             self.msg.setText("⚠ Douyin không trả dữ liệu — bấm 🔍 Nhận diện lại.")
             return
         nick, code = v.get("author_nickname", ""), v.get("code", "")
-        self.author.setText(f"{nick}  (#{code})" if code else nick)
+        name_vi = v.get("author_nickname") and v.get("name_vi", "") or ""
+        disp = nick
+        if name_vi and name_vi != nick:
+            disp = f"{nick} • {name_vi}"
+        self.author.setText(f"{disp}  (#{code})" if code else disp)
         self.desc.setText(str(v.get("desc", "")))
         w, h, q = v.get("width", ""), v.get("height", ""), v.get("quality", "")
         res = f"{w}x{h}" + (f" [{q}]" if q else "") if w else ""
