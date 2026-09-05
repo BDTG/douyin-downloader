@@ -79,6 +79,24 @@ def _extract_aweme_id(*urls: str) -> Optional[str]:
     return None
 
 
+def _all_http(o, acc):
+    """Gom TAT CA url http trong obj (giu thu tu), de chon loc (uu tien webp)."""
+    if isinstance(o, str):
+        if o.startswith("http"):
+            acc.append(o)
+    elif isinstance(o, dict):
+        for k in ("url_list", "urlList"):
+            v = o.get(k)
+            if isinstance(v, list):
+                for s in v:
+                    _all_http(s, acc)
+        _all_http(o.get("url", ""), acc)
+    elif isinstance(o, list):
+        for s in o:
+            _all_http(s, acc)
+    return acc
+
+
 def _first_http(o):
     """Lay URL http dau tien trong obj (str/dict url_list/danh sach long nhau)."""
     if isinstance(o, str):
@@ -103,15 +121,19 @@ def _first_http(o):
 
 
 def _best_image_url(item):
-    """Anh ngon nhat 1 item gallery: khong watermark > goc > hien thi > fallback."""
+    """Anh ngon nhat 1 item gallery: khong watermark > goc > hien thi > fallback.
+    Trong cung 1 muc uu tien: chon webp truoc (cung diem anh, nhe hon jpeg ~25-30%)."""
     if not isinstance(item, dict):
         return ""
     for c in (item.get("watermark_free_download_url_list"),
               item.get("origin_image"), item.get("display_image"),
               item, item.get("download_url_list")):
-        u = _first_http(c)
-        if u:
-            return u
+        urls = _all_http(c, [])
+        if urls:
+            for u in urls:
+                if ".webp" in u.split("?")[0]:
+                    return u
+            return urls[0]
     return ""
 
 
