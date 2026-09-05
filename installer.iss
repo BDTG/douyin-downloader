@@ -44,7 +44,7 @@ Name: "{group}\Douyin Downloader"; Filename: "{app}\app\DouyinDownloader.exe"
 Name: "{autodesktop}\Douyin Downloader"; Filename: "{app}\app\DouyinDownloader.exe"; Tasks: desktopicon
 
 [Tasks]
-Name: desktopicon; Description: "Tạo icon ngoài Desktop"; Flags: unchecked
+Name: desktopicon; Description: "Tạo icon ngoài Desktop"; Flags: checkedonce
 
 [Run]
 Filename: "{app}\app\DouyinDownloader.exe"; Description: "Chạy Douyin Downloader"; Flags: nowait postinstall skipifsilent

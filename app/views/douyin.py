@@ -428,6 +428,11 @@ class DouyinPage(QWidget):
         if not isinstance(v, dict) or (not v.get("aweme_id") and not v.get("author_nickname")):
             self.msg.setText("⚠ Không nhận diện được link này.")
             return
+        if not v.get("aweme_id"):
+            # có nickname nhưng Douyin không trả detail (chặn tạm thời) — báo thử lại
+            self.author.setText(str(v.get("author_nickname", "")))
+            self.msg.setText("⚠ Douyin không trả dữ liệu — bấm 🔍 Nhận diện lại.")
+            return
         nick, code = v.get("author_nickname", ""), v.get("code", "")
         self.author.setText(f"{nick}  (#{code})" if code else nick)
         self.desc.setText(str(v.get("desc", "")))
