@@ -22,6 +22,7 @@ exe = EXE(
     name="DouyinDownloader",
     debug=False,
     console=False,
+    icon="assets/icon.ico",
 )
 coll = COLLECT(
     exe,

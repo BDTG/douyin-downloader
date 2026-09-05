@@ -18,7 +18,9 @@ OutputBaseFilename=DouyinDownloader-Setup-{#AppVersion}
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile=assets/icon.ico
 UninstallDisplayName=Douyin Downloader
+UninstallDisplayIcon={app}\app\DouyinDownloader.exe
 ; Giữ downloads + cookie khi gỡ (chỉ xóa file app đã cài)
 UninstallFilesDir={app}\uninstall
 
@@ -40,8 +42,8 @@ Name: "{app}\engine\downloads"
 Name: "{app}\engine\logs"
 
 [Icons]
-Name: "{group}\Douyin Downloader"; Filename: "{app}\app\DouyinDownloader.exe"
-Name: "{autodesktop}\Douyin Downloader"; Filename: "{app}\app\DouyinDownloader.exe"; Tasks: desktopicon
+Name: "{group}\Douyin Downloader"; Filename: "{app}\app\DouyinDownloader.exe"; IconFilename: "{app}\app\DouyinDownloader.exe"
+Name: "{autodesktop}\Douyin Downloader"; Filename: "{app}\app\DouyinDownloader.exe"; IconFilename: "{app}\app\DouyinDownloader.exe"; Tasks: desktopicon
 
 [Tasks]
 Name: desktopicon; Description: "Tạo icon ngoài Desktop"; Flags: checkedonce
