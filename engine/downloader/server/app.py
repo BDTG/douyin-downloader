@@ -537,6 +537,18 @@ def build_app(config: ConfigLoader) -> FastAPI:
             from .viname import hanviet_name  # type: ignore
         return hanviet_name(name)
 
+    @app.get("/api/v1/videsc")
+    async def videsc(text: str = "") -> Dict[str, Any]:
+        """Dich mo ta Trung -> Viet (Gemini free tier, cache file). Khong key -> rong."""
+        import os as _os
+        try:
+            from server.videsc import translate_desc
+        except ImportError:
+            from .videsc import translate_desc  # type: ignore
+        key = str(deps.config.get("gemini_api_key") or "") or _os.environ.get(
+            "GEMINI_API_KEY", "") or _os.environ.get("GOOGLE_API_KEY", "")
+        return {"original": text, "desc_vi": translate_desc(text, key)}
+
     @app.post("/api/v1/download_images")
     async def download_images(req: DownloadImagesRequest) -> Dict[str, Any]:
         """Tai rieng cac anh trong post gallery. indices rong = tat ca (toi da 35)."""

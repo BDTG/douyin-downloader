@@ -13,6 +13,8 @@ engine/logs/*
 engine/api/config.native.yml
 engine/api/config.yml
 engine/api/.cookies.json
+engine/var/*
+!engine/var/.gitkeep
 **/*.db
 # installer output (build local, không commit)
 installer/*.exe

@@ -388,6 +388,12 @@ class DouyinPage(QWidget):
             self._show_resolve(payload)
         elif tag == "resolved":
             self.show_result(payload if status == "ok" and isinstance(payload, dict) else {})
+        elif tag == "videsc":
+            d = payload if isinstance(payload, dict) else {}
+            vi = str(d.get("vi", ""))
+            d0 = str(d.get("desc0", ""))
+            if vi and d0 and self.desc.text().startswith(d0[:20]):
+                self.desc.setText(self.desc.text() + "\n🇻🇳 " + vi)
         elif tag == "download":
             d = payload.get("data", payload) if isinstance(payload, dict) else {}
             jid = str(d.get("job_id", ""))
@@ -440,6 +446,16 @@ class DouyinPage(QWidget):
             disp = f"{nick} • {name_vi}"
         self.author.setText(f"{disp}  (#{code})" if code else disp)
         self.desc.setText(str(v.get("desc", "")))
+        _desc0 = str(v.get("desc", ""))
+        if any("一" <= ch <= "鿿" for ch in _desc0):
+            def _fetch_vi(_d=_desc0):
+                try:
+                    r = self.sup.call_op(MID, "videsc", {"text": _d}, timeout_s=30)
+                    dd = (r.get("data", {}) or {}) if isinstance(r, dict) else {}
+                    return {"desc0": _d, "vi": str(dd.get("desc_vi", ""))}
+                except Exception:
+                    return {"desc0": _d, "vi": ""}
+            self._bg("videsc", _fetch_vi)
         w, h, q = v.get("width", ""), v.get("height", ""), v.get("quality", "")
         res = f"{w}x{h}" + (f" [{q}]" if q else "") if w else ""
         mt = v.get("media_type", "")

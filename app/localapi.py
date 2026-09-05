@@ -116,4 +116,12 @@ class LocalStack:
             except RuntimeError as e:
                 return {"ok": False, "error": str(e)}
             return {"ok": True, "data": r}
+        if op == "videsc":
+            try:
+                from urllib.parse import quote
+                r = _http("GET", "/api/v1/videsc?text=" + quote(str(params.get("text", ""))),
+                          timeout_s + 40)
+            except RuntimeError:
+                return {"ok": True, "data": {"desc_vi": ""}}
+            return {"ok": True, "data": r}
         raise RuntimeError(f"unknown op {op}")
