@@ -4,7 +4,20 @@ App tải video/ảnh Douyin chất lượng gốc theo user — chạy độc l
 không cần framework. Engine Python trong `--stack-dir`,
 UI Qt (PySide6) gọi thẳng HTTP, Gallery/Tracker/Files vẫn là web.
 
-## Chạy dễ nhất (exe)
+## Cài đặt (khuyên dùng)
+
+```bat
+iscc installer.iss
+installer\DouyinDownloader-Setup-1.0.0.exe
+```
+
+Không cần admin. Installer gồm app Qt + engine Python + venv đóng gói sẵn
+(khỏi pip install). Lần đầu: điền cookie vào
+`<chỗ cài>\engine\api\config.native.yml` (mẫu tự tạo sẵn).
+Nâng cấp giữ nguyên cookie + downloads. Đã test: cài lặng → api/web 200,
+resolve ra Tiểu Nguyệt Nguyệt [QHD] → gỡ sạch.
+
+## Chạy dev (không cài)
 
 ```bat
 .venv\Scripts\pyinstaller.exe app.spec --noconfirm

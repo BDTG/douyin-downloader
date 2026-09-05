@@ -14,3 +14,5 @@ engine/api/config.native.yml
 engine/api/config.yml
 engine/api/.cookies.json
 **/*.db
+# installer output (build local, không commit)
+installer/*.exe

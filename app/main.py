@@ -43,6 +43,14 @@ def build_app(stack_dir: str):
 
 
 def _default_stack() -> str:
+    if getattr(sys, "frozen", False):
+        # exe PyInstaller: engine nằm cạnh thư mục app khi cài đặt
+        # (<install>\app\DouyinDownloader.exe -> <install>\engine)
+        exe_dir = Path(sys.executable).resolve().parent
+        for c in (exe_dir / "engine", exe_dir.parent / "engine"):
+            if (c / "api").is_dir():
+                return str(c)
+        return str(exe_dir.parent / "engine")
     here = Path(__file__).resolve()
     cands = [here.parents[1] / "engine", Path("D:/ThucTap/douyin-docker")]
     for c in cands:
