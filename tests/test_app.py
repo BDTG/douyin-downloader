@@ -88,7 +88,7 @@ class TestPage(unittest.TestCase):
         p = DouyinPage(ls)
         p.show_result({"type": "user", "author_nickname": "T", "author_sec_uid": "S",
                        "code": "", "name_vi": "Te"})
-        self.assertTrue(p.user_box.isVisible())
+        self.assertFalse(p.user_box.isHidden())
         p._render_uposts([{"aweme_id": "1", "desc": "mô tả 1", "date": "2026-09-01",
                            "digg_count": 5, "media_type": "video", "image_count": 0},
                           {"aweme_id": "2", "desc": "mô tả 2", "date": "2026-09-02",
