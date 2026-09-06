@@ -91,8 +91,10 @@ async function loadSpec(gi,el){
   <div class="bar">
     <input id="q" placeholder="🔍 Tìm tiêu đề / tên file..." oninput="render()">
     <select id="sort" onchange="render()">
-      <option value="new">Mới nhất trước</option>
-      <option value="old">Cũ nhất trước</option>
+      <option value="new">Mới tải về trước</option>
+      <option value="old">Tải về cũ trước</option>
+      <option value="pnew">Ngày đăng mới trước</option>
+      <option value="pold">Ngày đăng cũ trước</option>
       <option value="name">Tên A→Z</option>
       <option value="size">Dung lượng lớn trước</option>
     </select>
@@ -154,6 +156,8 @@ function sortedItems(items){
   const s=$('sort').value, a=[...items];
   if(s==='new')a.sort((x,y)=>y.mtime-x.mtime);
   else if(s==='old')a.sort((x,y)=>x.mtime-y.mtime);
+  else if(s==='pnew')a.sort((x,y)=>(y.date||'').localeCompare(x.date||''));
+  else if(s==='pold')a.sort((x,y)=>(x.date||'9999').localeCompare(y.date||'9999'));
   else if(s==='name')a.sort((x,y)=>x.name.localeCompare(y.name));
   else if(s==='size')a.sort((x,y)=>y.size-x.size);
   return a;
