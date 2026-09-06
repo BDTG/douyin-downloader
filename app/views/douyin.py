@@ -80,7 +80,7 @@ class DouyinPage(QWidget):
         row.addWidget(self.b_stop)
         cl.addLayout(row)
         links = QHBoxLayout()
-        for name, key in (("Tracker", "tracker"), ("Gallery", "gallery"), ("Files đã tải", "files")):
+        for name, key in (("Gallery", "gallery"), ("Files đã tải", "files")):
             b = QPushButton(name)
             b.setObjectName("ghost")
             b.clicked.connect(lambda _=False, k=key: self._open_ui(k))
@@ -501,7 +501,7 @@ class DouyinPage(QWidget):
             d = payload.get("data", payload) if isinstance(payload, dict) else {}
             jid = str(d.get("job_id", ""))
             if not jid:
-                self.msg.setText("Xem chi tiết ở Tracker.")
+                self.msg.setText("Xem chi tiết ở Gallery.")
                 return
             self.msg.setText("✅ Đã giao job tải.")
             self._log_job(f"⬇ Tạo job tải {jid}")

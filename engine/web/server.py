@@ -1,4 +1,4 @@
-"""Web frontend native thay nginx: serve tracker/files.html + proxy /api/ -> :8000, /gallery/ -> :8001.
+"""Web frontend native thay nginx: redirect / ve gallery, serve files.html + proxy /api/ -> :8000, /gallery/ -> :8001.
 
 Chay: .venv/Scripts/python.exe web/server.py  (nghe 127.0.0.1:8080)
 Chi dung stdlib. Stream response nen video seek (Range) van chay.
@@ -72,8 +72,10 @@ class H(BaseHTTPRequestHandler):
 
     def _route(self):
         path = self.path.split("?", 1)[0]
-        if path == "/" or path == "/tracker.html":
-            serve_file(self, "tracker.html")
+        if path == "/" or path == "/gallery":
+            self.send_response(301)
+            self.send_header("Location", "/gallery/")
+            self.end_headers()
         elif path == "/files" or path == "/files/" or path == "/files.html":
             serve_file(self, "files.html")
         elif path.startswith("/api/"):
@@ -92,10 +94,12 @@ class H(BaseHTTPRequestHandler):
             except Exception:
                 self.send_error(400)
                 return
-            if p.is_file():
+            if p.is_file() and p.suffix == ".html":
                 serve_file(self, p.name)
             else:
-                serve_file(self, "tracker.html")
+                self.send_response(301)
+                self.send_header("Location", "/gallery/")
+                self.end_headers()
 
     do_GET = _route
     do_POST = _route

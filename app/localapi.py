@@ -69,7 +69,7 @@ class LocalStack:
                 "api": "ok" if self.man.api_ok() else "down"}}
         if op == "uiUrls":
             return {"ok": True, "data": {
-                "tracker": WEB + "/", "gallery": WEB + "/gallery/",
+                "gallery": WEB + "/gallery/",
                 "files": WEB + "/files/", "apiHealth": API + "/api/v1/health"}}
         if op == "resolve":
             # api trả full ngay (không nền như module) -> gói kiểu resolveResult
