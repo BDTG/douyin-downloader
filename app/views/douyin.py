@@ -293,24 +293,29 @@ class DouyinPage(QWidget):
             if not r.get("ok", True):
                 msg = str(r.get("error", "lỗi"))
                 if "404" in msg or "not found" in msg.lower():
-                    self._set_job(f"Job {job_id}: ⚠ job mất (api đã restart?) — bấm ⬇ Tải lại.")
+                    self._emit_job(f"Job {job_id}: ⚠ job mất (api đã restart?) — bấm ⬇ Tải lại.", None)
                 else:
-                    self._set_job(f"Job {job_id}: ⚠ {msg}")
+                    self._emit_job(f"Job {job_id}: ⚠ {msg}", None)
                 return
             st = str(d.get("status", ""))
             err = str(d.get("error") or "")
             low = st.lower()
             if "fail" in low:
-                self._set_job(f"Job {job_id}: {st}" + (f" — {err}" if err else ""))
+                self._emit_job(f"Job {job_id}: {st}" + (f" — {err}" if err else ""), None)
                 return
             if "success" in low or low == "done":
-                self._set_job(f"Job {job_id}: {st} — file ở Gallery.")
-                self._bar(100, None)
+                self._emit_job(f"Job {job_id}: {st} — file ở Gallery.", (100, None))
                 return
-            self._set_job(f"Job {job_id}: {st}")
             dl, tot = int(d.get("downloaded_bytes") or 0), int(d.get("total_bytes") or 0)
-            if tot > 0:
-                self._bar(int(min(100, dl * 100 // tot)), (dl, tot))
+            bar = (int(min(100, dl * 100 // tot)), (dl, tot)) if tot > 0 else None
+            self._emit_job(f"Job {job_id}: {st}", bar)
+
+    def _emit_job(self, s: str, bar):
+        """Poll chay thread nen — chi emit signal, UI thread tu ve (Qt cam cham widget)."""
+        try:
+            self._bus.done.emit("jobpoll", ("ok", {"text": s, "bar": bar}))
+        except RuntimeError:
+            pass  # app da dong
 
     def _set_job(self, s: str):
         self.job.setText(s)
@@ -400,6 +405,14 @@ class DouyinPage(QWidget):
             return
         if status != "ok":
             self.msg.setText(f"Lỗi: {payload}")
+            return
+        if tag == "jobpoll":
+            d = payload if isinstance(payload, dict) else {}
+            if d.get("text") is not None:
+                self._set_job(str(d["text"]))
+            if d.get("bar") is not None:
+                pct, dt = d["bar"]
+                self._bar(int(pct), dt)
             return
         if tag == "resolve":
             self._show_resolve(payload)
