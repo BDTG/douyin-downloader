@@ -8,6 +8,8 @@ from __future__ import annotations
 import threading
 import time
 import urllib.request
+from datetime import datetime
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 # sup ở bản standalone là LocalStack (duck-type Supervisor của apphost).
@@ -180,6 +182,27 @@ class DouyinPage(QWidget):
         self.gal_box.setVisible(False)
         lay.addWidget(self.gal_box)
 
+        # nhat ky job (giu lai thong bao cu, doc duoc sau crash)
+        logbox = QWidget()
+        logbox.setObjectName("card")
+        ll = QVBoxLayout(logbox)
+        lh = QHBoxLayout()
+        lt = QLabel("📋 Nhật ký tải")
+        lt.setStyleSheet("font-weight: 600;")
+        b_clear = QPushButton("Xóa")
+        b_clear.setObjectName("ghost")
+        b_clear.clicked.connect(self._clear_joblog)
+        lh.addWidget(lt)
+        lh.addStretch(1)
+        lh.addWidget(b_clear)
+        ll.addLayout(lh)
+        self.joblog = QListWidget()
+        self.joblog.setObjectName("mono")
+        self.joblog.setMaximumHeight(110)
+        ll.addWidget(self.joblog)
+        lay.addWidget(logbox)
+        self._load_joblog()
+
         self._tick = QTimer(self)
         self._tick.setInterval(5000)
         self._tick.timeout.connect(self._kick_status)
@@ -320,6 +343,53 @@ class DouyinPage(QWidget):
     def _set_job(self, s: str):
         self.job.setText(s)
 
+    def _joblog_path(self) -> Optional[Path]:
+        try:
+            base = Path(self.sup.man.stack_dir)
+        except Exception:
+            return None
+        try:
+            base.mkdir(parents=True, exist_ok=True)
+            (base / "logs").mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+        return base / "logs" / "jobs_ui.log"
+
+    def _load_joblog(self):
+        try:
+            p = self._joblog_path()
+            lines = p.read_text(encoding="utf-8", errors="replace").splitlines()[-50:] if p and p.is_file() else []
+        except Exception:
+            lines = []
+        for ln in lines:
+            if ln.strip():
+                self.joblog.addItem(ln)
+        if lines:
+            self.joblog.scrollToBottom()
+
+    def _log_job(self, text: str):
+        line = f"{datetime.now():%H:%M:%S}  {text}"
+        self.joblog.addItem(line)
+        while self.joblog.count() > 200:
+            self.joblog.takeItem(0)
+        self.joblog.scrollToBottom()
+        try:
+            p = self._joblog_path()
+            if p:
+                with open(p, "a", encoding="utf-8") as f:
+                    f.write(line + "\n")
+        except Exception:
+            pass
+
+    def _clear_joblog(self):
+        self.joblog.clear()
+        try:
+            p = self._joblog_path()
+            if p and p.is_file():
+                p.write_text("", encoding="utf-8")
+        except Exception:
+            pass
+
     def _bar(self, pct: int, dt):
         self.bar.setVisible(True)
         self.bar.setValue(pct)
@@ -410,6 +480,9 @@ class DouyinPage(QWidget):
             d = payload if isinstance(payload, dict) else {}
             if d.get("text") is not None:
                 self._set_job(str(d["text"]))
+                _t = str(d["text"])
+                if "⚠" in _t or "success" in _t.lower() or "fail" in _t.lower():
+                    self._log_job(_t)
             if d.get("bar") is not None:
                 pct, dt = d["bar"]
                 self._bar(int(pct), dt)
@@ -431,6 +504,7 @@ class DouyinPage(QWidget):
                 self.msg.setText("Xem chi tiết ở Tracker.")
                 return
             self.msg.setText("✅ Đã giao job tải.")
+            self._log_job(f"⬇ Tạo job tải {jid}")
             self._last_dl = (0, time.time())
             self._poll_id += 1
             threading.Thread(target=self._poll, args=(jid, self._poll_id), daemon=True).start()
@@ -439,8 +513,9 @@ class DouyinPage(QWidget):
             saved = d.get("saved", []) if isinstance(d, dict) else []
             failed = d.get("failed", []) if isinstance(d, dict) else []
             n, f = len(saved), len(failed)
-            self.msg.setText(f"✅ Đã tải {n} ảnh gốc" + (f" ({f} lỗi)" if f else "") + " — xem ở Gallery."
-                            if n else "⚠ Không tải được ảnh nào.")
+            _t = f"🖼 Tải ảnh: {n} xong" + (f" ({f} lỗi)" if f else "")
+            self.msg.setText(_t + " — xem ở Gallery." if n else "⚠ Không tải được ảnh nào.")
+            self._log_job(_t if n else "⚠ Không tải được ảnh nào.")
 
     def _show_resolve(self, payload):
         # module resolve là nền 2 bước: ở đây payload là {pending,id} -> poll resolveResult
