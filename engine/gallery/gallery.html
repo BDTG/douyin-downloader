@@ -91,10 +91,10 @@ async function loadSpec(gi,el){
   <div class="bar">
     <input id="q" placeholder="🔍 Tìm tiêu đề / tên file..." oninput="render()">
     <select id="sort" onchange="render()">
+      <option value="pnew" selected>Ngày đăng mới trước</option>
+      <option value="pold">Ngày đăng cũ trước</option>
       <option value="new">Mới tải về trước</option>
       <option value="old">Tải về cũ trước</option>
-      <option value="pnew">Ngày đăng mới trước</option>
-      <option value="pold">Ngày đăng cũ trước</option>
       <option value="name">Tên A→Z</option>
       <option value="size">Dung lượng lớn trước</option>
     </select>
