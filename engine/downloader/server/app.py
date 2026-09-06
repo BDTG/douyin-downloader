@@ -571,6 +571,98 @@ def build_app(config: ConfigLoader) -> FastAPI:
             "GEMINI_API_KEY", "") or _os.environ.get("GOOGLE_API_KEY", "")
         return {"original": text, "desc_vi": translate_desc(text, key)}
 
+    @app.post("/api/v1/user_posts")
+    async def user_posts(req: Dict[str, Any]) -> Dict[str, Any]:
+        """Liet ke post cua 1 acc (chon tung video de tai). Body: {url|sec_uid, cursor, count}."""
+        from datetime import datetime, timezone, timedelta
+        url = str((req or {}).get("url") or "").strip()
+        sec_uid = str((req or {}).get("sec_uid") or "").strip()
+        try:
+            cursor = int((req or {}).get("cursor") or 0)
+        except Exception:
+            cursor = 0
+        try:
+            count = min(50, max(1, int((req or {}).get("count") or 20)))
+        except Exception:
+            count = 20
+        async with DouyinAPIClient(
+            deps.cookie_manager.get_cookies(),
+            proxy=deps.config.get("proxy"),
+        ) as api_client:
+            if not sec_uid and url:
+                m = re.search(r"https?://[^\s\"'<>]+", url)
+                u = m.group(0).rstrip(".,!?)]}>;") if m else url
+                if is_short_url(u):
+                    try:
+                        r = await api_client.resolve_short_url(normalize_short_url(u))
+                        if r:
+                            u = r
+                    except Exception:
+                        pass
+                parsed = URLParser.parse(u) or {}
+                sec_uid = str(parsed.get("sec_uid") or "")
+            if not sec_uid:
+                raise HTTPException(status_code=422, detail="khong tim thay user (can link trang ca nhan)")
+            try:
+                page = await api_client.get_user_post(sec_uid, cursor, count)
+            except Exception as exc:
+                raise HTTPException(status_code=502, detail=f"Douyin loi: {type(exc).__name__}")
+            items = page.get("aweme_list") or page.get("items") or []
+            out = []
+            for it in items:
+                if not isinstance(it, dict):
+                    continue
+                aid = str(it.get("aweme_id") or "")
+                if not aid:
+                    continue
+                video = it.get("video") or {}
+                stat = it.get("statistics") or {}
+                try:
+                    dur = round(float(video.get("duration") or it.get("duration") or 0) / 1000, 1)
+                except Exception:
+                    dur = 0
+                try:
+                    ct = int(it.get("create_time") or 0)
+                    date = (datetime.fromtimestamp(ct, tz=timezone.utc) + timedelta(hours=7)).strftime("%Y-%m-%d") if ct else ""
+                except Exception:
+                    date = ""
+                cover = ""
+                try:
+                    from core.metadata import extract_video_cover_urls
+                    covers = extract_video_cover_urls(it)
+                    if covers:
+                        cover = covers[0]
+                except Exception:
+                    pass
+                ipi = it.get("image_post_info") or {}
+                imgs = []
+                if isinstance(ipi, dict):
+                    for k in ("images", "image_list"):
+                        c = ipi.get(k)
+                        if isinstance(c, list) and c:
+                            imgs = c
+                            break
+                out.append({
+                    "aweme_id": aid,
+                    "desc": str(it.get("desc") or "")[:120],
+                    "cover_url": cover,
+                    "duration_s": dur,
+                    "width": int(video.get("width") or 0),
+                    "height": int(video.get("height") or 0),
+                    "date": date,
+                    "digg_count": int(stat.get("digg_count") or 0),
+                    "comment_count": int(stat.get("comment_count") or 0),
+                    "share_count": int(stat.get("share_count") or 0),
+                    "play_count": int(stat.get("play_count") or 0),
+                    "media_type": "gallery" if imgs else "video",
+                    "image_count": len(imgs),
+                    "music_title": str((it.get("music") or {}).get("title") or "")[:60],
+                })
+            return {"sec_uid": sec_uid, "cursor": cursor,
+                    "next_cursor": page.get("max_cursor") or page.get("cursor") or 0,
+                    "has_more": bool(page.get("has_more", True)) and bool(out),
+                    "items": out}
+
     @app.post("/api/v1/download_images")
     async def download_images(req: DownloadImagesRequest) -> Dict[str, Any]:
         """Tai rieng cac anh trong post gallery. indices rong = tat ca (toi da 35)."""

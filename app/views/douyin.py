@@ -51,6 +51,10 @@ class DouyinPage(QWidget):
         self._bus.done.connect(self._on_bg)
         self._poll_id = 0
         self._gal_urls: List[str] = []
+        self._uposts: List[Dict[str, Any]] = []
+        self._usec = ""
+        self._ucursor = 0
+        self._uhas_more = False
         self._gal_aweme = ""
         self._last_dl = (0, 0.0)
 
@@ -182,6 +186,35 @@ class DouyinPage(QWidget):
         self.gal_box.setVisible(False)
         lay.addWidget(self.gal_box)
 
+        # danh sach post cua 1 acc (chon tung video de tai)
+        self.user_box = QWidget()
+        self.user_box.setObjectName("card")
+        ul = QVBoxLayout(self.user_box)
+        unav = QHBoxLayout()
+        self.user_count = QLabel()
+        self.user_count.setObjectName("mono")
+        unav.addWidget(self.user_count, 1)
+        b_more = QPushButton("Tải thêm ↓")
+        b_more.setObjectName("ghost")
+        b_more.clicked.connect(self._uposts_more)
+        unav.addWidget(b_more)
+        ul.addLayout(unav)
+        self.user_list = QListWidget()
+        self.user_list.setMaximumHeight(220)
+        self.user_list.itemChanged.connect(self._uposts_changed)
+        ul.addWidget(self.user_list)
+        urow = QHBoxLayout()
+        for label, fn in (("⬇ Tải đã chọn", self._uposts_picked),
+                          ("⬇ Tải tất cả trang này", self._uposts_all)):
+            b = QPushButton(label)
+            b.setObjectName("ghost")
+            b.clicked.connect(fn)
+            urow.addWidget(b)
+        urow.addStretch(1)
+        ul.addLayout(urow)
+        self.user_box.setVisible(False)
+        lay.addWidget(self.user_box)
+
         # nhat ky job (giu lai thong bao cu, doc duoc sau crash)
         logbox = QWidget()
         logbox.setObjectName("card")
@@ -279,6 +312,135 @@ class DouyinPage(QWidget):
         self._clear_result()
         self._bg("resolve", lambda: self.sup.call_op(MID, "resolve", {"url": url}, timeout_s=30))
 
+    # -- post cua 1 acc: quet danh sach, tick chon tung video de tai --
+    def _show_user(self, v: Dict[str, Any]):
+        nick = v.get("author_nickname", "")
+        code = v.get("code", "")
+        name_vi = v.get("name_vi", "")
+        disp = nick + (f" • {name_vi}" if name_vi and name_vi != nick else "")
+        self.author.setText(f"{disp}  (#{code})" if code else disp)
+        self.desc.setText("")
+        self.spec.setText("📄 Trang cá nhân — tick chọn video rồi bấm tải.")
+        self.msg.setText("Đang quét danh sách video…")
+        self._uposts = []
+        self._usec = str(v.get("author_sec_uid") or "")
+        self._ucursor = 0
+        self._uhas_more = False
+        self.user_list.blockSignals(True)
+        self.user_list.clear()
+        self.user_list.blockSignals(False)
+        self.user_box.setVisible(True)
+        self._bg("userposts", lambda: self._fetch_uposts(append=False))
+
+    def _fetch_uposts(self, append: bool):
+        r = self.sup.call_op(MID, "userPosts",
+                             {"sec_uid": self._usec, "cursor": self._ucursor, "count": 20},
+                             timeout_s=90)
+        d = (r.get("data", {}) or {}) if isinstance(r, dict) else {}
+        if not r.get("ok", True):
+            raise RuntimeError(str(r.get("error", "lỗi")))
+        return {"items": d.get("items", []), "next": d.get("next_cursor", 0),
+                "more": bool(d.get("has_more")), "append": append}
+
+    def _render_uposts(self, items, append: bool, nxt, more: bool):
+        from PySide6.QtWidgets import QListWidgetItem as _QWI
+        if not append:
+            self._uposts = []
+            self.user_list.blockSignals(True)
+            self.user_list.clear()
+            self.user_list.blockSignals(False)
+        self.user_list.blockSignals(True)
+        for it in items:
+            self._uposts.append(it)
+            desc = (it.get("desc") or "(không mô tả)")[:60]
+            tag = f"[ảnh {it.get('image_count')}] " if it.get("media_type") == "gallery" else ""
+            line = f"☑ [{it.get('date', '')}] {tag}{desc} | tim {it.get('digg_count', 0)}"
+            qwi = _QWI(line)
+            qwi.setCheckState(Qt.Checked)
+            self.user_list.addItem(qwi)
+        self.user_list.blockSignals(False)
+        self._ucursor = nxt
+        self._uhas_more = more
+        self._uposts_changed(None)
+
+    def _uposts_changed(self, _item):
+        n = sum(1 for i in range(self.user_list.count())
+                if self.user_list.item(i).checkState() == Qt.Checked)
+        extra = " • còn nữa (bấm Tải thêm ↓)" if self._uhas_more else ""
+        self.user_count.setText(f"{self.user_list.count()} video  •  đã chọn {n}{extra}")
+
+    def _uposts_more(self):
+        if not self._usec:
+            return
+        self.msg.setText("Đang tải thêm…")
+        self._bg("userposts", lambda: self._fetch_uposts(append=True))
+
+    def _uposts_picked(self):
+        idx = [i for i in range(self.user_list.count())
+               if self.user_list.item(i).checkState() == Qt.Checked]
+        if not idx:
+            self.msg.setText("⚠ Chưa tick video nào.")
+            return
+        aids = [self._uposts[i]["aweme_id"] for i in idx if i < len(self._uposts)]
+        self._bg("userdl", lambda: self._download_awemes(aids))
+
+    def _uposts_all(self):
+        if not self._uposts:
+            return
+        self._bg("userdl", lambda: self._download_awemes([it["aweme_id"] for it in self._uposts]))
+
+    def _download_awemes(self, aids):
+        done, fail = 0, 0
+        logs = []
+        for n, aid in enumerate(aids, 1):
+            url = f"https://www.douyin.com/video/{aid}"
+            try:
+                r = self.sup.call_op(MID, "download", {"url": url}, timeout_s=30)
+            except Exception as exc:
+                self._emit_job(f"⚠ {aid}: {exc}", None)
+                fail += 1
+                continue
+            d = (r.get("data", {}) or {}) if isinstance(r, dict) else {}
+            jid = str(d.get("job_id", ""))
+            if not jid:
+                self._emit_job(f"⚠ {aid}: không tạo được job", None)
+                fail += 1
+                continue
+            logs.append(f"⬇ [{n}/{len(aids)}] job {jid} <- {aid}")
+            if self._poll_sync(jid):
+                done += 1
+            else:
+                fail += 1
+        summary = f"✅ Xong {done}/{len(aids)} video" + (f" ({fail} lỗi)" if fail else "")
+        logs.append(summary)
+        return {"done": done, "fail": fail, "logs": logs}
+
+    def _poll_sync(self, job_id: str) -> bool:
+        """Poll 1 job toi khi xong (dung trong worker tai nhieu video). True = success."""
+        for _ in range(300):  # ~20 phut/job
+            time.sleep(4)
+            try:
+                r = self.sup.call_op(MID, "jobStatus", {"job_id": job_id}, timeout_s=15)
+            except Exception:
+                continue
+            d = (r.get("data", {}) or {}) if isinstance(r, dict) else {}
+            if not r.get("ok", True):
+                self._emit_job(f"Job {job_id}: ⚠ {d.get('error', r.get('error', 'lỗi'))}", None)
+                return False
+            st = str(d.get("status", ""))
+            low = st.lower()
+            if "success" in low or low == "done":
+                self._emit_job(f"Job {job_id}: {st} — file ở Gallery.", (100, None))
+                return True
+            if "fail" in low:
+                self._emit_job(f"Job {job_id}: {st} — {d.get('error', '')}", None)
+                return False
+            dl, tot = int(d.get("downloaded_bytes") or 0), int(d.get("total_bytes") or 0)
+            bar = (int(min(100, dl * 100 // tot)), (dl, tot)) if tot > 0 else None
+            self._emit_job(f"Job {job_id}: {st}", bar)
+        self._emit_job(f"Job {job_id}: ⚠ quá lâu, bỏ qua", None)
+        return False
+
     def _clear_result(self):
         self.author.setText("")
         self.desc.setText("")
@@ -286,6 +448,7 @@ class DouyinPage(QWidget):
         self.preview.setText("Chưa có preview")
         self.preview.setPixmap(QPixmap())
         self.gal_box.setVisible(False)
+        self.user_box.setVisible(False)
         self._gal_urls = []
         self._gal_aweme = ""
 
@@ -487,6 +650,22 @@ class DouyinPage(QWidget):
                 pct, dt = d["bar"]
                 self._bar(int(pct), dt)
             return
+        if tag == "userposts":
+            d = payload if isinstance(payload, dict) else {}
+            self._render_uposts(d.get("items", []), bool(d.get("append")),
+                                d.get("next", 0), bool(d.get("more")))
+            n = len(d.get("items", []))
+            self.msg.setText(f"✅ Quét được {self.user_list.count()} video — tick chọn rồi bấm tải." if n
+                             else "⚠ Acc này không quét được video (riêng tư/chặn).")
+            return
+        if tag == "userdl":
+            d = payload if isinstance(payload, dict) else {}
+            for ln in (d.get("logs") or []):
+                self._log_job(str(ln))
+            self.msg.setText(f"✅ Xong {d.get('done', 0)} video" +
+                             (f" ({d.get('fail', 0)} lỗi)" if d.get("fail") else "") +
+                             " — xem ở Gallery.")
+            return
         if tag == "resolve":
             self._show_resolve(payload)
         elif tag == "resolved":
@@ -538,6 +717,9 @@ class DouyinPage(QWidget):
     def show_result(self, v: Dict[str, Any]):
         if not isinstance(v, dict) or (not v.get("aweme_id") and not v.get("author_nickname")):
             self.msg.setText("⚠ Không nhận diện được link này.")
+            return
+        if v.get("type") == "user" and (v.get("author_sec_uid") or v.get("author_nickname")):
+            self._show_user(v)
             return
         if not v.get("aweme_id"):
             # có nickname nhưng Douyin không trả detail (chặn tạm thời) — báo thử lại

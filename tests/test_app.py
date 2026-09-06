@@ -82,6 +82,23 @@ class TestPage(unittest.TestCase):
         p._tick.stop()
         p.close()
 
+    def test_show_user_and_render_posts(self):
+        app()
+        ls = LocalStack("D:/ThucTap/douyin-docker")
+        p = DouyinPage(ls)
+        p.show_result({"type": "user", "author_nickname": "T", "author_sec_uid": "S",
+                       "code": "", "name_vi": "Te"})
+        self.assertTrue(p.user_box.isVisible())
+        p._render_uposts([{"aweme_id": "1", "desc": "mô tả 1", "date": "2026-09-01",
+                           "digg_count": 5, "media_type": "video", "image_count": 0},
+                          {"aweme_id": "2", "desc": "mô tả 2", "date": "2026-09-02",
+                           "digg_count": 7, "media_type": "gallery", "image_count": 3}],
+                         False, 123, True)
+        self.assertEqual(p.user_list.count(), 2)
+        self.assertIn("đã chọn 2", p.user_count.text())
+        p._tick.stop()
+        p.close()
+
 
 if __name__ == "__main__":
     unittest.main()
