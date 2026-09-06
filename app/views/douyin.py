@@ -5,6 +5,7 @@ signal. 1 job = 1 vòng poll (số hiệu tăng dần, vòng cũ tự dừng).
 """
 from __future__ import annotations
 
+import random
 import threading
 import time
 import urllib.request
@@ -55,6 +56,7 @@ class DouyinPage(QWidget):
         self._usec = ""
         self._ucursor = 0
         self._uhas_more = False
+        self._usan_id = 0
         self._gal_aweme = ""
         self._last_dl = (0, 0.0)
 
@@ -198,6 +200,10 @@ class DouyinPage(QWidget):
         b_more.setObjectName("ghost")
         b_more.clicked.connect(self._uposts_more)
         unav.addWidget(b_more)
+        b_all = QPushButton("Quét hết")
+        b_all.setObjectName("ghost")
+        b_all.clicked.connect(self._uposts_scan_all)
+        unav.addWidget(b_all)
         ul.addLayout(unav)
         self.user_list = QListWidget()
         self.user_list.setMaximumHeight(220)
@@ -326,6 +332,7 @@ class DouyinPage(QWidget):
         self._usec = str(v.get("author_sec_uid") or "")
         self._ucursor = 0
         self._uhas_more = False
+        self._usan_id += 1  # huy vong quet het cu (neu co)
         self.user_list.blockSignals(True)
         self.user_list.clear()
         self.user_list.blockSignals(False)
@@ -374,6 +381,39 @@ class DouyinPage(QWidget):
             return
         self.msg.setText("Đang tải thêm…")
         self._bg("userposts", lambda: self._fetch_uposts(append=True))
+
+    def _uposts_scan_all(self):
+        """Quet het cac trang (toi da ~300 video), nghi ngau nhien 2-5s giua trang."""
+        if not self._usec:
+            return
+        self._usan_id += 1
+        my = self._usan_id
+        sec = self._usec
+        cur = self._ucursor
+        self.msg.setText("Đang quét hết (nghỉ 2-5s/trang)…")
+        def run():
+            total = 0
+            try:
+                while my == self._usan_id:
+                    r = self.sup.call_op(MID, "userPosts",
+                                         {"sec_uid": sec, "cursor": cur, "count": 20},
+                                         timeout_s=90)
+                    d = (r.get("data", {}) or {}) if isinstance(r, dict) else {}
+                    if not r.get("ok", True):
+                        raise RuntimeError(str(r.get("error", "lỗi")))
+                    items = d.get("items", [])
+                    self._bus.done.emit("userposts", ("ok", {
+                        "items": items, "next": d.get("next_cursor", 0),
+                        "more": bool(d.get("has_more")), "append": True}))
+                    total += len(items)
+                    cur = d.get("next_cursor", 0)
+                    if not d.get("has_more") or not items or total >= 300:
+                        break
+                    time.sleep(random.uniform(2, 5))
+            except RuntimeError as exc:
+                if my == self._usan_id:
+                    self._bus.done.emit("userposts", ("err", str(exc)))
+        threading.Thread(target=run, daemon=True).start()
 
     def _uposts_picked(self):
         idx = [i for i in range(self.user_list.count())
