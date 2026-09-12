@@ -8,6 +8,9 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 SAFE_RE = re.compile(r"[\\/:*?\"<>|]")
+AID_RE = re.compile(r"(\d{10,})")
+MEDIA_SUFFIXES = {".mp4", ".jpg", ".jpeg", ".png", ".webp", ".gif"}
+SIDECAR_TAILS = ("_cover", "_avatar", "_music")
 
 
 def safe_name(s: str, limit: int = 60) -> str:
@@ -52,3 +55,39 @@ def manifest_lookup(downloads: Path) -> Dict[str, Dict[str, Any]]:
     except Exception:
         pass
     return idx
+
+
+def local_aweme_ids(downloads: Path) -> set:
+    """Quet ten file local tim aweme_id da co media chinh (>0 byte).
+
+    Bo qua sidecar (_cover/_avatar/_music) vi co cover khong co nghia co video.
+    """
+    found: set = set()
+    try:
+        if not downloads.exists():
+            return found
+        for p in downloads.rglob("*"):
+            if not p.is_file():
+                continue
+            if p.suffix.lower() not in MEDIA_SUFFIXES:
+                continue
+            if p.stem.lower().endswith(SIDECAR_TAILS):
+                continue
+            try:
+                if p.stat().st_size <= 0:
+                    continue
+            except OSError:
+                continue
+            m = AID_RE.search(p.name)
+            if m:
+                found.add(m.group(1))
+    except Exception:
+        pass
+    return found
+
+
+def aweme_downloaded(downloads: Path, aweme_id: str) -> bool:
+    """True neu aweme_id da co file chinh local."""
+    if not aweme_id:
+        return False
+    return aweme_id in local_aweme_ids(downloads)

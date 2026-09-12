@@ -10,6 +10,7 @@ from core.douyin import (  # noqa: E402
     extract_mix_id,
     normalize_detail,
     quality_from_size,
+    video_url_candidates,
 )
 
 
@@ -61,3 +62,31 @@ def test_normalize_gallery():
         "desc": "gal", "create_time": 1700000000}, "u", "o")
     assert d["media_type"] == "gallery"
     assert d["image_count"] == 2
+
+
+def test_video_url_candidates_order():
+    urls = video_url_candidates({
+        "play_addr": {"url_list": ["http://base.mp4"]},
+        "bit_rate": [
+            {"bit_rate": 500, "play_addr": {"url_list": ["http://low.mp4"]}},
+            {"bit_rate": 2000, "play_addr": {"url_list": ["http://high.mp4"]}},
+            {"bit_rate": 2000, "play_addr": {"url_list": ["http://high.mp4"]}},
+        ]})
+    assert urls[0] == "http://high.mp4"
+    assert len(urls) == len(set(urls))
+    assert "http://base.mp4" in urls
+
+
+def test_local_aweme_dedup(tmp_path):
+    from core.storage import aweme_downloaded, local_aweme_ids
+    aid = "7123456789012345678"
+    assert aweme_downloaded(tmp_path, aid) is False
+    (tmp_path / f"2024-01-01_hi_{aid}.mp4").write_bytes(b"x" * 10)
+    (tmp_path / f"2024-01-01_hi_{aid}_cover.jpg").write_bytes(b"x" * 10)
+    (tmp_path / "note.txt").write_text("bo qua")
+    ids = local_aweme_ids(tmp_path)
+    assert aid in ids
+    assert aweme_downloaded(tmp_path, aid) is True
+    # sidecar don le khong tinh
+    (tmp_path / f"2024-01-01_hi_{aid}.mp4").unlink()
+    assert aweme_downloaded(tmp_path, aid) is False

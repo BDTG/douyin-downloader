@@ -262,6 +262,28 @@ def _best_video_url(video: Dict[str, Any]) -> tuple[str, int, int]:
     return best, bw, bh
 
 
+def video_url_candidates(video: Dict[str, Any], limit: int = 4) -> List[str]:
+    """Danh sach URL video du phong theo bitrate giam dan (khong trung).
+
+    Nha minh tu viet: lay url dau tien cua tung bit_rate (cao -> thap),
+    them play_addr cuoi cung. Downloader thu lan luot den khi duoc.
+    """
+    seen: List[str] = []
+    rows = [br for br in (video.get("bit_rate") or []) if isinstance(br, dict)]
+    rows.sort(key=lambda br: int(br.get("bit_rate") or br.get("bitrate") or 0),
+              reverse=True)
+    for br in rows:
+        u = _first_url(br.get("play_addr") or br)
+        if u and u not in seen:
+            seen.append(u)
+        if len(seen) >= limit:
+            break
+    fallback = _first_url(video.get("play_addr") or {})
+    if fallback and fallback not in seen and len(seen) < limit:
+        seen.append(fallback)
+    return seen
+
+
 def _gallery_urls(detail: Dict[str, Any]) -> List[str]:
     ipi = detail.get("image_post_info") or {}
     items: List[Any] = []
@@ -313,10 +335,16 @@ def normalize_detail(detail: Dict[str, Any], resolved_url: str = "",
     if is_gallery:
         media_type = "gallery"
         play_url, w, h = "", 0, 0
+        play_urls: List[str] = []
         duration = 0.0
     else:
         media_type = "video"
         play_url, w, h = _best_video_url(video)
+        play_urls = video_url_candidates(video)
+        if play_url and play_url not in play_urls:
+            play_urls = [play_url] + play_urls
+        elif not play_urls and play_url:
+            play_urls = [play_url]
         try:
             duration = float(video.get("duration") or detail.get("duration") or 0) / 1000.0
             if duration <= 0:
@@ -350,6 +378,7 @@ def normalize_detail(detail: Dict[str, Any], resolved_url: str = "",
         "images": images,
         "image_count": len(images),
         "play_url": play_url,  # noi bo: server dung de tai
+        "play_urls": play_urls if not is_gallery else [],
         "resolved": resolved_url,
         "original": original_text,
     }

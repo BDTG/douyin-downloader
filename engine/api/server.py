@@ -318,6 +318,15 @@ async def _run_download(job_id: str, url_text: str) -> None:
             raise RuntimeError("day la link trang ca nhan — dung chuc nang quet user")
         aid = str(info.get("aweme_id") or "")
         job["current_aweme"] = aid
+        # B: chong tai trung toan cuc — co file chinh thi skip, khong tai lai
+        from core.storage import aweme_downloaded
+        if aid and aweme_downloaded(dl_dir(), aid):
+            job["status"] = "SUCCESS"
+            job["success"] = 1
+            job["total"] = 1
+            job["error"] = "da co san (skip trung)"
+            job["finished_at"] = time.time()
+            return
         sec = str(info.get("author_sec_uid") or "unknown")
         folder = item_dir(dl_dir(), sec, str(info.get("date") or ""),
                           str(info.get("desc") or ""), aid)
@@ -328,12 +337,32 @@ async def _run_download(job_id: str, url_text: str) -> None:
             saved = await _save_images(aid, folder, imgs, list(range(len(imgs))), job)
             info["saved_images"] = saved
         else:
-            play = str(info.get("play_url") or "")
-            if not play:
+            # A: fallback nhieu URL — thu lan luot den khi duoc
+            urls = [u for u in (info.get("play_urls") or []) if u]
+            first = str(info.get("play_url") or "")
+            if first and first not in urls:
+                urls = [first] + urls
+            if not urls:
                 raise RuntimeError("khong lay duoc link video goc")
             dest = folder / f"{info.get('date') or 'video'}_{safe_name(info.get('desc') or '', 30)}_{aid}.mp4"
             if not (dest.exists() and dest.stat().st_size > 0):
-                await download_binary(play, dest, job)
+                last_err: Exception | None = None
+                for u in urls[:4]:
+                    try:
+                        await download_binary(u, dest, job)
+                        last_err = None
+                        break
+                    except Exception as e:
+                        last_err = e
+                        try:
+                            tmp = dest.with_suffix(dest.suffix + ".tmp")
+                            if tmp.exists():
+                                tmp.unlink()
+                        except Exception:
+                            pass
+                        continue
+                if last_err is not None:
+                    raise last_err
             info["saved_video"] = dest.name
         append_manifest(dl_dir(), {
             "aweme_id": aid, "author_name": info.get("author_nickname"),
