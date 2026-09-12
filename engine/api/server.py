@@ -37,8 +37,10 @@ from core.douyin import (
     classify_link,
     date_from_ts,
     extract_first_url,
+    extract_mix_id,
     fetch_aweme_json,
     fetch_aweme_ssr,
+    fetch_mix_page,
     normalize_detail,
     random_mstoken,
     resolve_short,
@@ -156,6 +158,13 @@ class LocalInfoBody(BaseModel):
 class UserPostsBody(BaseModel):
     url: str = ""
     sec_uid: str = ""
+    cursor: int = 0
+    count: int = 20
+
+
+class MixPostsBody(BaseModel):
+    url: str = ""
+    mix_id: str = ""
     cursor: int = 0
     count: int = 20
 
@@ -502,6 +511,39 @@ async def user_posts(body: UserPostsBody):
     return {"sec_uid": sec, "cursor": cursor,
             "next_cursor": data.get("max_cursor") or 0,
             "has_more": bool(data.get("has_more")),
+            "items": items}
+
+
+def _slim_item(n: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "aweme_id": n["aweme_id"], "desc": (n["desc"] or "")[:120],
+        "date": n["date"], "digg_count": n["digg_count"],
+        "comment_count": n["comment_count"], "share_count": n["share_count"],
+        "play_count": n.get("play_count", 0),
+        "media_type": n["media_type"], "image_count": n["image_count"],
+        "cover_url": n["cover_url"], "duration_s": n["duration_s"],
+        "width": n["width"], "height": n["height"],
+        "music_title": n["music_title"]}
+
+
+@app.post("/api/v1/mix_posts")
+async def mix_posts(body: MixPostsBody):
+    """Danh sach video trong 1 collection/mix (viet moi, phan trang cursor)."""
+    mid = (body.mix_id or "").strip() or extract_mix_id(body.url or "")
+    if not mid:
+        raise HTTPException(422, "thieu mix_id (link /collection/ hoac /mix/)")
+    count = max(1, min(int(body.count or 20), 50))
+    page = await fetch_mix_page(mid, int(body.cursor or 0), count, cookies())
+    items: List[Dict[str, Any]] = []
+    for raw in page["items"][:count]:
+        try:
+            items.append(_slim_item(normalize_detail(raw)))
+        except Exception:
+            continue
+    return {"mix_id": mid, "mix_name": page.get("mix_name", ""),
+            "cursor": int(body.cursor or 0),
+            "next_cursor": page.get("next_cursor") or 0,
+            "has_more": bool(page.get("has_more")),
             "items": items}
 
 

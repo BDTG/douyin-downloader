@@ -133,4 +133,13 @@ class LocalStack:
             except RuntimeError as e:
                 return {"ok": False, "error": str(e)}
             return {"ok": True, "data": r}
+        if op == "mixPosts":
+            try:
+                r = _http("POST", "/api/v1/mix_posts",
+                          {"url": params.get("url", ""), "mix_id": params.get("mix_id", ""),
+                           "cursor": params.get("cursor", 0), "count": params.get("count", 20)},
+                          timeout_s + 60)
+            except RuntimeError as e:
+                return {"ok": False, "error": str(e)}
+            return {"ok": True, "data": r}
         raise RuntimeError(f"unknown op {op}")

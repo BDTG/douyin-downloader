@@ -23,6 +23,7 @@ cookie nguoi dung, khong dung chu ky phuc tap.
 - `POST /api/v1/download_images` {aweme_id, indices[]} → {saved[], failed[]}
 - `POST /api/v1/localinfo` {path} → thong tin file local (ffprobe neu co)
 - `POST /api/v1/user_posts` {sec_uid, cursor, count} → danh sach video 1 acc
+- `POST /api/v1/mix_posts` {mix_id|url, cursor, count} → danh sach video 1 collection
 - `GET /api/v1/videsc?text=` → dich Trung-Viet (Gemini, co cache)
 - `GET /api/v1/viname?name=` → ten Han-Viet offline
 - `GET /api/v1/health` → {"status":"ok"}

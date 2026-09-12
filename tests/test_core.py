@@ -7,6 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "engine"))
 from core.douyin import (  # noqa: E402
     classify_link,
     extract_first_url,
+    extract_mix_id,
     normalize_detail,
     quality_from_size,
 )
@@ -23,6 +24,9 @@ def test_classify():
     assert classify_link("https://www.douyin.com/note/123456789012345")["type"] == "gallery"
     assert classify_link("https://v.douyin.com/abc/")["type"] == "short"
     assert classify_link("https://www.douyin.com/user/MS4wLjABAAAAxxxx")["type"] == "user"
+    assert classify_link("https://www.douyin.com/collection/123456789012345")["type"] == "mix"
+    assert classify_link("https://www.douyin.com/mix/123456789012345")["type"] == "mix"
+    assert extract_mix_id("xem https://www.douyin.com/collection/123456789012345 nhe") == "123456789012345"
 
 
 def test_quality_short_edge():

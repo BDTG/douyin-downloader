@@ -27,6 +27,7 @@ URL_RE = re.compile(r"https?://[^\s\"'<>`]+", re.I)
 AWEME_RE = re.compile(r"/(?:video|note|slides|gallery)/(\d{6,})")
 MODAL_RE = re.compile(r"modal_id=(\d{6,})")
 USER_RE = re.compile(r"/user/([A-Za-z0-9_\-]+)")
+MIX_RE = re.compile(r"/(?:collection|mix)/(\d{6,})")
 SHORT_HOSTS = ("v.douyin.com", "v.iesdouyin.com", "iesdouyin.com")
 
 VN_TZ = timezone(timedelta(hours=7))
@@ -80,7 +81,7 @@ def base_headers(referer: str = "https://www.douyin.com/") -> Dict[str, str]:
 
 
 def classify_link(url: str) -> Dict[str, str]:
-    """Phan loai link thanh video / note / user / short / unknown (thuan regex)."""
+    """Phan loai link: video / gallery / user / mix / short / unknown (thuan regex)."""
     u = (url or "").strip()
     host = urlparse(u).netloc.lower() if "://" in u else ""
     if any(h in host for h in SHORT_HOSTS):
@@ -89,6 +90,9 @@ def classify_link(url: str) -> Dict[str, str]:
     if m:
         kind = "gallery" if ("/note/" in u or "/slides/" in u or "/gallery/" in u) else "video"
         return {"type": kind, "id": m.group(1)}
+    m = MIX_RE.search(u)
+    if m:
+        return {"type": "mix", "id": m.group(1)}
     m = USER_RE.search(u)
     if m:
         return {"type": "user", "id": m.group(1)}
@@ -349,3 +353,54 @@ def normalize_detail(detail: Dict[str, Any], resolved_url: str = "",
         "resolved": resolved_url,
         "original": original_text,
     }
+
+
+def extract_mix_id(text: str) -> str:
+    """Lay mix_id tu URL hoac doan share-text (collection/mix)."""
+    m = MIX_RE.search(text or "")
+    return m.group(1) if m else ""
+
+
+async def fetch_mix_page(mix_id: str, cursor: int, count: int,
+                         cookies: Dict[str, str],
+                         timeout: float = 25.0) -> Dict[str, Any]:
+    """Lay 1 trang danh sach video trong collection (viet moi, chi dung HTTP cong khai).
+
+    Tra ve {"items": [aweme_detail, ...], "next_cursor": int, "has_more": bool,
+            "mix_name": str}. Bi chan -> items rong, has_more False.
+    """
+    headers = base_headers()
+    if cookies:
+        headers["Cookie"] = _cookie_header(cookies)
+    params = {
+        "device_platform": "webapp",
+        "aid": "6383",
+        "mix_id": mix_id,
+        "cursor": int(cursor or 0),
+        "count": max(1, min(int(count or 20), 50)),
+        "version_code": "170400",
+        "msToken": cookies.get("msToken") or random_mstoken(),
+    }
+    try:
+        async with httpx.AsyncClient(timeout=timeout, headers=headers,
+                                     follow_redirects=True) as c:
+            r = await c.get("https://www.douyin.com/aweme/v1/web/mix/aweme/",
+                            params=params)
+            if r.status_code != 200:
+                return {"items": [], "next_cursor": cursor,
+                        "has_more": False, "mix_name": ""}
+            data = r.json()
+    except Exception:
+        return {"items": [], "next_cursor": cursor,
+                "has_more": False, "mix_name": ""}
+    items = data.get("aweme_list") or data.get("aweme_details") or []
+    if not isinstance(items, list):
+        items = []
+    mix_info = data.get("mix_info") or data.get("mix_detail") or {}
+    name = ""
+    if isinstance(mix_info, dict):
+        name = str(mix_info.get("mix_name") or mix_info.get("name") or "")
+    return {"items": items,
+            "next_cursor": data.get("max_cursor") or data.get("cursor") or 0,
+            "has_more": bool(data.get("has_more")),
+            "mix_name": name}
