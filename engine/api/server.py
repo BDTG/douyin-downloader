@@ -483,6 +483,8 @@ def localinfo(body: LocalInfoBody):
 
 @app.post("/api/v1/user_posts")
 async def user_posts(body: UserPostsBody):
+    from core.control import RateLimiter, with_retry
+
     sec = (body.sec_uid or "").strip()
     if not sec and body.url:
         m = re.search(r"/user/([A-Za-z0-9_\-]+)", body.url)
@@ -499,15 +501,22 @@ async def user_posts(body: UserPostsBody):
               "sec_user_id": sec, "max_cursor": cursor, "count": count,
               "version_code": "170400",
               "msToken": ck.get("msToken") or random_mstoken()}
-    try:
+    if not hasattr(user_posts, "_limiter"):
+        user_posts._limiter = RateLimiter(2.0)  # type: ignore[attr-defined]
+
+    async def _call():
+        await user_posts._limiter.acquire()  # type: ignore[attr-defined]
         async with httpx.AsyncClient(timeout=25, headers=headers) as c:
             r = await c.get("https://www.douyin.com/aweme/v1/web/aweme/post/",
                             params=params)
             if r.status_code != 200:
-                raise HTTPException(502, f"douyin {r.status_code}")
-            data = r.json()
-    except HTTPException:
-        raise
+                raise RuntimeError(f"douyin {r.status_code}")
+            return r.json()
+
+    try:
+        data = await with_retry(_call, retries=2)
+    except RuntimeError as e:
+        raise HTTPException(502, str(e))
     except Exception as e:
         raise HTTPException(502, f"loi mang douyin: {e}")
     items: List[Dict[str, Any]] = []

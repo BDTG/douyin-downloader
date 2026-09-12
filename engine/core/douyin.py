@@ -363,12 +363,15 @@ def extract_mix_id(text: str) -> str:
 
 async def fetch_mix_page(mix_id: str, cursor: int, count: int,
                          cookies: Dict[str, str],
-                         timeout: float = 25.0) -> Dict[str, Any]:
+                         timeout: float = 25.0,
+                         retries: int = 2) -> Dict[str, Any]:
     """Lay 1 trang danh sach video trong collection (viet moi, chi dung HTTP cong khai).
 
-    Tra ve {"items": [aweme_detail, ...], "next_cursor": int, "has_more": bool,
-            "mix_name": str}. Bi chan -> items rong, has_more False.
+    Co rate-limit (~2 req/s) + thu lai loi mang. Bi chan -> items rong.
+    Tra ve {"items": [...], "next_cursor": int, "has_more": bool, "mix_name": str}.
     """
+    from core.control import BACKOFFS, RateLimiter
+
     headers = base_headers()
     if cookies:
         headers["Cookie"] = _cookie_header(cookies)
@@ -381,18 +384,26 @@ async def fetch_mix_page(mix_id: str, cursor: int, count: int,
         "version_code": "170400",
         "msToken": cookies.get("msToken") or random_mstoken(),
     }
-    try:
-        async with httpx.AsyncClient(timeout=timeout, headers=headers,
-                                     follow_redirects=True) as c:
-            r = await c.get("https://www.douyin.com/aweme/v1/web/mix/aweme/",
-                            params=params)
-            if r.status_code != 200:
-                return {"items": [], "next_cursor": cursor,
-                        "has_more": False, "mix_name": ""}
-            data = r.json()
-    except Exception:
-        return {"items": [], "next_cursor": cursor,
-                "has_more": False, "mix_name": ""}
+    if not hasattr(fetch_mix_page, "_limiter"):
+        fetch_mix_page._limiter = RateLimiter(2.0)  # type: ignore[attr-defined]
+    empty = {"items": [], "next_cursor": cursor,
+             "has_more": False, "mix_name": ""}
+    import asyncio as _aio
+    for attempt in range(max(0, int(retries)) + 1):
+        try:
+            await fetch_mix_page._limiter.acquire()  # type: ignore[attr-defined]
+            async with httpx.AsyncClient(timeout=timeout, headers=headers,
+                                         follow_redirects=True) as c:
+                r = await c.get("https://www.douyin.com/aweme/v1/web/mix/aweme/",
+                                params=params)
+                if r.status_code != 200:
+                    raise RuntimeError(f"douyin {r.status_code}")
+                data = r.json()
+            break
+        except Exception:
+            if attempt >= retries:
+                return empty
+            await _aio.sleep(BACKOFFS[min(attempt, len(BACKOFFS) - 1)])
     items = data.get("aweme_list") or data.get("aweme_details") or []
     if not isinstance(items, list):
         items = []
