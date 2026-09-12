@@ -114,8 +114,3 @@ chữ ký phức tạp, ưu tiên bản gốc không watermark.
 - Chỉ tải video **của chính bạn / được phép**.
 - Tải lẻ vài link/ngày thì ổn, tải batch phải giãn cách 2-5s/trang tránh checkpoint.
 - Tool phục vụ nghiên cứu, bạn tự chịu trách nhiệm bản quyền.
-
-## 👤 Tác giả
-
-BDTG — toàn bộ `app/ + engine/api + engine/core + gallery + web` viết mới,
-không fork/kèm source ngoài.
