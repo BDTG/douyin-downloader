@@ -99,6 +99,21 @@ class TestPage(unittest.TestCase):
         p._tick.stop()
         p.close()
 
+    def test_show_mix_and_render_posts(self):
+        app()
+        ls = LocalStack("D:/ThucTap/douyin-docker")
+        p = DouyinPage(ls)
+        with mock.patch.object(ls, "call_op", return_value={"ok": True, "data": {"items": []}}):
+            p.show_result({"type": "mix", "mix_id": "123", "mix_name": "Bo suu tap"})
+        self.assertFalse(p.mix_box.isHidden())
+        p._render_mposts([{"aweme_id": "1", "desc": "mô tả 1", "date": "2026-09-01",
+                           "digg_count": 5, "media_type": "video", "image_count": 0}],
+                         False, 0, False)
+        self.assertEqual(p.mix_list.count(), 1)
+        self.assertIn("đã chọn 1", p.mix_count.text())
+        p._tick.stop()
+        p.close()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -193,6 +193,12 @@ async def resolve_detail_from_text(text: str) -> Dict[str, Any]:
                 "author_sec_uid": sec, "name_vi": hv,
                 "code": ALIASES.get(sec, ""),
                 "resolved": url, "original": text}
+    if cls["type"] == "mix":
+        mid = cls["id"]
+        page = await fetch_mix_page(mid, 0, 1, cookies())
+        return {"type": "mix", "mix_id": mid,
+                "mix_name": page.get("mix_name", ""),
+                "resolved": url, "original": text}
     aid = cls["id"]
     if not aid:
         # co the la link user dang token sec_uid

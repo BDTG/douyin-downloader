@@ -57,6 +57,11 @@ class DouyinPage(QWidget):
         self._ucursor = 0
         self._uhas_more = False
         self._usan_id = 0
+        self._mposts: List[Dict[str, Any]] = []
+        self._mmix = ""
+        self._mcursor = 0
+        self._mhas_more = False
+        self._mscan_id = 0
         self._gal_aweme = ""
         self._last_dl = (0, 0.0)
 
@@ -220,6 +225,35 @@ class DouyinPage(QWidget):
         ul.addLayout(urow)
         self.user_box.setVisible(False)
         lay.addWidget(self.user_box)
+
+        # danh sach video cua 1 collection (chon tung video de tai)
+        self.mix_box = QWidget()
+        self.mix_box.setObjectName("card")
+        ml = QVBoxLayout(self.mix_box)
+        mnav = QHBoxLayout()
+        self.mix_count = QLabel()
+        self.mix_count.setObjectName("mono")
+        mnav.addWidget(self.mix_count, 1)
+        b_mmore = QPushButton("Tải thêm ↓")
+        b_mmore.setObjectName("ghost")
+        b_mmore.clicked.connect(self._mposts_more)
+        mnav.addWidget(b_mmore)
+        ml.addLayout(mnav)
+        self.mix_list = QListWidget()
+        self.mix_list.setMaximumHeight(220)
+        self.mix_list.itemChanged.connect(self._mposts_changed)
+        ml.addWidget(self.mix_list)
+        mrow = QHBoxLayout()
+        for label, fn in (("⬇ Tải đã chọn", self._mposts_picked),
+                          ("⬇ Tải tất cả trang này", self._mposts_all)):
+            b = QPushButton(label)
+            b.setObjectName("ghost")
+            b.clicked.connect(fn)
+            mrow.addWidget(b)
+        mrow.addStretch(1)
+        ml.addLayout(mrow)
+        self.mix_box.setVisible(False)
+        lay.addWidget(self.mix_box)
 
         # nhat ky job (giu lai thong bao cu, doc duoc sau crash)
         logbox = QWidget()
@@ -429,6 +463,82 @@ class DouyinPage(QWidget):
             return
         self._bg("userdl", lambda: self._download_awemes([it["aweme_id"] for it in self._uposts]))
 
+    # -- video cua 1 collection: quet danh sach, tick chon tung video de tai --
+    def _show_mix(self, v: Dict[str, Any]):
+        name = v.get("mix_name", "") or "Collection"
+        mid = v.get("mix_id", "")
+        self.author.setText(f"📁 {name}  (#{mid})" if mid else name)
+        self.desc.setText("")
+        self.spec.setText("📁 Collection — tick chọn video rồi bấm tải.")
+        self.msg.setText("Đang quét danh sách video…")
+        self._mposts = []
+        self._mmix = str(mid)
+        self._mcursor = 0
+        self._mhas_more = False
+        self._mscan_id += 1
+        self.mix_list.blockSignals(True)
+        self.mix_list.clear()
+        self.mix_list.blockSignals(False)
+        self.mix_box.setVisible(True)
+        self._bg("mixposts", lambda: self._fetch_mposts(append=False))
+
+    def _fetch_mposts(self, append: bool):
+        r = self.sup.call_op(MID, "mixPosts",
+                             {"mix_id": self._mmix, "cursor": self._mcursor, "count": 20},
+                             timeout_s=90)
+        d = (r.get("data", {}) or {}) if isinstance(r, dict) else {}
+        if not r.get("ok", True):
+            raise RuntimeError(str(r.get("error", "lỗi")))
+        return {"items": d.get("items", []), "next": d.get("next_cursor", 0),
+                "more": bool(d.get("has_more")), "append": append}
+
+    def _render_mposts(self, items, append: bool, nxt, more: bool):
+        from PySide6.QtWidgets import QListWidgetItem as _QWI
+        if not append:
+            self._mposts = []
+            self.mix_list.blockSignals(True)
+            self.mix_list.clear()
+            self.mix_list.blockSignals(False)
+        self.mix_list.blockSignals(True)
+        for it in items:
+            self._mposts.append(it)
+            desc = (it.get("desc") or "(không mô tả)")[:60]
+            tag = f"[ảnh {it.get('image_count')}] " if it.get("media_type") == "gallery" else ""
+            line = f"☑ [{it.get('date', '')}] {tag}{desc} | tim {it.get('digg_count', 0)}"
+            qwi = _QWI(line)
+            qwi.setCheckState(Qt.Checked)
+            self.mix_list.addItem(qwi)
+        self.mix_list.blockSignals(False)
+        self._mcursor = nxt
+        self._mhas_more = more
+        self._mposts_changed(None)
+
+    def _mposts_changed(self, _item):
+        n = sum(1 for i in range(self.mix_list.count())
+                if self.mix_list.item(i).checkState() == Qt.Checked)
+        extra = " • còn nữa (bấm Tải thêm ↓)" if self._mhas_more else ""
+        self.mix_count.setText(f"{self.mix_list.count()} video  •  đã chọn {n}{extra}")
+
+    def _mposts_more(self):
+        if not self._mmix:
+            return
+        self.msg.setText("Đang tải thêm…")
+        self._bg("mixposts", lambda: self._fetch_mposts(append=True))
+
+    def _mposts_picked(self):
+        idx = [i for i in range(self.mix_list.count())
+               if self.mix_list.item(i).checkState() == Qt.Checked]
+        if not idx:
+            self.msg.setText("⚠ Chưa tick video nào.")
+            return
+        aids = [self._mposts[i]["aweme_id"] for i in idx if i < len(self._mposts)]
+        self._bg("userdl", lambda: self._download_awemes(aids))
+
+    def _mposts_all(self):
+        if not self._mposts:
+            return
+        self._bg("userdl", lambda: self._download_awemes([it["aweme_id"] for it in self._mposts]))
+
     def _download_awemes(self, aids):
         done, fail = 0, 0
         logs = []
@@ -489,6 +599,7 @@ class DouyinPage(QWidget):
         self.preview.setPixmap(QPixmap())
         self.gal_box.setVisible(False)
         self.user_box.setVisible(False)
+        self.mix_box.setVisible(False)
         self._gal_urls = []
         self._gal_aweme = ""
 
@@ -698,6 +809,14 @@ class DouyinPage(QWidget):
             self.msg.setText(f"✅ Quét được {self.user_list.count()} video — tick chọn rồi bấm tải." if n
                              else "⚠ Acc này không quét được video (riêng tư/chặn).")
             return
+        if tag == "mixposts":
+            d = payload if isinstance(payload, dict) else {}
+            self._render_mposts(d.get("items", []), bool(d.get("append")),
+                                d.get("next", 0), bool(d.get("more")))
+            n = len(d.get("items", []))
+            self.msg.setText(f"✅ Quét được {self.mix_list.count()} video — tick chọn rồi bấm tải." if n
+                             else "⚠ Collection này không quét được video (riêng tư/chặn).")
+            return
         if tag == "userdl":
             d = payload if isinstance(payload, dict) else {}
             for ln in (d.get("logs") or []):
@@ -755,11 +874,15 @@ class DouyinPage(QWidget):
         return {}
 
     def show_result(self, v: Dict[str, Any]):
-        if not isinstance(v, dict) or (not v.get("aweme_id") and not v.get("author_nickname")):
+        if not isinstance(v, dict) or (not v.get("aweme_id") and not v.get("author_nickname")
+                                       and not v.get("mix_id")):
             self.msg.setText("⚠ Không nhận diện được link này.")
             return
         if v.get("type") == "user" and (v.get("author_sec_uid") or v.get("author_nickname")):
             self._show_user(v)
+            return
+        if v.get("type") == "mix" and v.get("mix_id"):
+            self._show_mix(v)
             return
         if not v.get("aweme_id"):
             # có nickname nhưng Douyin không trả detail (chặn tạm thời) — báo thử lại
