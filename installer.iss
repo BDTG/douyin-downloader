@@ -28,7 +28,8 @@ UninstallFilesDir={app}\uninstall
 ; --- app Qt (PyInstaller) ---
 Source: "{#SrcRoot}\dist\DouyinDownloader\*"; DestDir: "{app}\app"; Flags: recursesubdirs ignoreversion
 ; --- engine Python (source, không kèm secret) ---
-Source: "{#SrcRoot}\engine\downloader\*"; DestDir: "{app}\engine\downloader"; Flags: recursesubdirs ignoreversion
+Source: "{#SrcRoot}\engine\api\*";   DestDir: "{app}\engine\api"; Flags: recursesubdirs ignoreversion
+Source: "{#SrcRoot}\engine\core\*";  DestDir: "{app}\engine\core"; Flags: recursesubdirs ignoreversion
 Source: "{#SrcRoot}\engine\gallery\*";      DestDir: "{app}\engine\gallery";      Flags: recursesubdirs ignoreversion
 Source: "{#SrcRoot}\engine\web\*";          DestDir: "{app}\engine\web";          Flags: recursesubdirs ignoreversion
 Source: "{#SrcRoot}\engine\aliases.json";   DestDir: "{app}\engine"; Flags: ignoreversion

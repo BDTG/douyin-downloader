@@ -54,9 +54,9 @@ class StackManager:
                     "DOUYIN_PATH": dl,
                     "DL_DIR": dl, "ALIAS_PATH": aliases, "SUBJECTS_PATH": subjects}
         return [
-            Service("api", 8000, str(Path(self.stack_dir) / "downloader"),
-                    [self.python, "run.py", "-c", cfg, "--serve",
-                     "--serve-host", "127.0.0.1", "--serve-port", "8000"], base_env),
+            Service("api", 8000, str(Path(self.stack_dir) / "api"),
+                    [self.python, "server.py", "-c", cfg,
+                     "--host", "127.0.0.1", "--port", "8000"], base_env),
             Service("gallery", 8001, str(Path(self.stack_dir) / "gallery"),
                     [self.python, "-m", "uvicorn", "app:app",
                      "--host", "127.0.0.1", "--port", "8001"], base_env),

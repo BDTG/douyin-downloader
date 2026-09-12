@@ -1,65 +1,44 @@
-# Douyin Tracker — Docker stack
+# Douyin Downloader — engine noi bo
 
-Chạy trang tracker + API tải video Douyin (không watermark, chất lượng cao nhất) trong Docker.
-
-## 1. Kiến trúc
+Stack chay local 3 services (do `app/stackman.py` quan ly):
 
 ```
-web  (nginx, :8080)  →  tracker.html (DB + quét link + nút ⬇ Tải)
-  ├─ /api/*  → proxy sang api:8000 (tránh lỗi CORS)
-  └─ /files/ → duyệt file đã tải
-gallery (python FastAPI, nội bộ) → grid xem video/ảnh theo user
-  (lọc + tìm kiếm, đọc metadata từ SQLite dy_downloader.db)
-  Code name: sửa `aliases.json` (key = sec_uid) rồi `docker compose restart gallery`.
-  Thư mục downloads đặt theo sec_uid nên không vỡ khi tác giả đổi nickname.
-api  (python + jiji262/douyin-downloader, :8000)
-  ├─ POST /api/v1/download {"url":"..."} → {job_id}
-  ├─ GET  /api/v1/jobs/{job_id}          → {status, success, failed, ...}
-  └─ file tải về nằm ở ./downloads/ (mount chung cho cả 2 container)
+api (:8000)      engine/api/server.py  — resolve / download / jobs / images / user_posts
+gallery (:8001)  engine/gallery/app.py — xem lai file da tai theo user
+web (:8080)      engine/web/server.py  — reverse-proxy /api + /gallery + /files
 ```
 
-## 2. Chạy
+Core tai: `engine/core/douyin.py` — viet moi 100% boi BDTG, chi dung
+HTTP cong khai + cookie nguoi dung, khong phu thuoc tool ngoai.
 
-Double-click **`start.bat`** (hoặc `docker compose up -d --build`), rồi mở:
+## 1. Chay
 
-- Web tracker: http://localhost:8080
-- Gallery xem video: http://localhost:8080/gallery/
-- Files đã tải: http://localhost:8080/files/
-- API trực tiếp: http://localhost:8000/api/v1/health
+Double-click **`start.bat`**, roi mo:
 
-Tắt: double-click **`stop.bat`**.
+- Web: http://localhost:8080
+- Gallery: http://localhost:8080/gallery/
+- Files: http://localhost:8080/files/
+- API: http://localhost:8000/api/v1/health
 
-## 3. Cookie Douyin (khi tải báo FAILED / chỉ tải được ~20 video)
+Tat: double-click **`stop.bat`**.
 
-Douyin chặn bot bằng `msToken`/`ttwid`. Lấy cookie từ trình duyệt đã đăng nhập Douyin:
+Venv engine (1 lan):
 
-1. Mở douyin.com → F12 → tab Application → Cookies → `https://www.douyin.com`
-2. Copy giá trị `ttwid`, `msToken`, `odin_tt`, `passport_csrf_token`
-3. Dán vào `api/config.yml` mục `cookies:`, rồi `docker compose restart api`
+```bat
+uv venv --python 3.11 engine\.venv
+uv pip install --python engine\.venv\Scripts\python.exe -r engine\api\requirements.txt
+```
 
-## 4. Vì sao ttget.com tải được chất lượng cao? (cơ chế, không phải phép màu)
+## 2. Cookie Douyin (khi tai bao FAILED)
 
-Douyin trả về cho chính app/web của nó một JSON mô tả video (`aweme detail API`), trong đó có:
+Douyin chan bot bang `msToken`/`ttwid`. Lay tu trinh duyet da dang nhap:
 
-- `video.play_addr.url_list` — link MP4 **sạch, không watermark**
-- `video.bit_rate[]` — thang chất lượng (bitrate thấp → cao)
+1. Mo douyin.com → F12 → Application → Cookies → `https://www.douyin.com`
+2. Copy `ttwid`, `msToken`, `odin_tt`, `passport_csrf_token`
+3. Dan vao `api/config.native.yml` muc `cookies:`, restart app
 
-Các trang như ttget và tool open source trong stack này (`downloader/`, MIT license)
-làm đúng 3 bước đó: gọi aweme API → chọn bitrate cao nhất → tải file MP4 từ CDN
-của Douyin về. Điểm khác nhau giữa các tool chỉ là cách vượt kiểm soát bot
-(cookie/signature) và độ ổn định khi Douyin đổi API.
+## 3. Gioi han that
 
-Tool open source đã khảo sát:
-
-| Tool | Nhận xét |
-|---|---|
-| `jiji262/douyin-downloader` (đang dùng) | Còn maintain (2026), video/note/collection/user-batch, server mode, SQLite, có Dockerfile |
-| `Evil0ctal/Douyin_TikTok_Download_API` | Phổ biến, FastAPI + web portal — phương án dự phòng |
-| `yt-dlp` | Hỗ trợ Douyin chập chờn (issue #9557), không nên làm nguồn chính |
-| `lzdyes/douyin-downloader` | App Tauri, ngừng update từ 2023 |
-
-## 5. Giới hạn thật
-
-- Link video **giả/mẫu** (như `.../video/7123456789...`) tải sẽ FAILED — phải dùng link thật.
-- Không cookie thì vẫn tải được video public đơn lẻ, nhưng batch user dễ bị chặn phân trang.
-- Chỉ tải video **của chính bạn / được phép** — tool ghi rõ mục đích nghiên cứu, tự chịu trách nhiệm bản quyền.
+- Link gia/mau (nhu `.../video/7123456789...`) se FAILED — phai dung link that.
+- Khong cookie van resolve duoc mot so link public, nhung tai batch de bi chan.
+- Chi tai video **cua chinh ban / duoc phep** — tu chiu trach nhiem ban quyen.
