@@ -3,6 +3,7 @@
 Chay:  python server.py -c config.native.yml --host 127.0.0.1 --port 8000
 Contract giu nguyen de app Qt khong phai sua:
   GET  /api/v1/health
+  GET  /api/v1/auth_status
   POST /api/v1/resolve {url}
   POST /api/v1/download {url}
   GET  /api/v1/jobs , GET /api/v1/jobs/{id}
@@ -45,6 +46,7 @@ from core.douyin import (
     random_mstoken,
     resolve_short,
 )
+from core.auth import auth_status, ensure_mstoken, sanitize_cookies, validate_cookies
 from core.hanviet import hanviet_name
 from core.storage import append_manifest, item_dir, manifest_lookup, safe_name
 
@@ -72,9 +74,11 @@ def load_config(path: str) -> Dict[str, Any]:
     except Exception:
         pass
     cookies = CFG.get("cookies") or {}
-    CFG["cookies"] = {k: str(v or "") for k, v in cookies.items() if str(v or "")}
-    if not CFG["cookies"].get("msToken"):
-        CFG["cookies"]["msToken"] = random_mstoken()
+    CFG["cookies"] = ensure_mstoken(sanitize_cookies(cookies))
+    ok, missing = validate_cookies(CFG["cookies"])
+    if not ok:
+        print(f"[api] cookie thieu: {', '.join(missing)} "
+              f"(tai le van duoc, batch de bi chan)", flush=True)
     dl = Path(str(CFG.get("path") or DOWNLOADS))
     try:
         dl.mkdir(parents=True, exist_ok=True)
@@ -286,6 +290,13 @@ async def download_binary(url: str, dest: Path, job: Optional[Dict] = None,
 @app.get("/api/v1/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/api/v1/auth_status")
+def auth_status_route():
+    """Trang thai cookie (de UI bao het cookie som, khong phai doi FAILED)."""
+    st = auth_status(cookies())
+    return st
 
 
 @app.post("/api/v1/resolve")

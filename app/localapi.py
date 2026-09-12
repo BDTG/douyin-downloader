@@ -71,6 +71,12 @@ class LocalStack:
             return {"ok": True, "data": {
                 "gallery": WEB + "/gallery/",
                 "files": WEB + "/files/", "apiHealth": API + "/api/v1/health"}}
+        if op == "authStatus":
+            try:
+                r = _http("GET", "/api/v1/auth_status", timeout_s)
+            except RuntimeError as e:
+                return {"ok": False, "error": str(e)}
+            return {"ok": True, "data": r}
         if op == "resolve":
             # api trả full ngay (không nền như module) -> gói kiểu resolveResult
             v = _http("POST", "/api/v1/resolve", {"url": params.get("url", "")},
