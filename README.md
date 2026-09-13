@@ -2,7 +2,7 @@
 
 Tải video / ảnh Douyin chất lượng gốc, không watermark — app Windows chạy độc lập.
 
-100% code bởi BDTG: UI Qt (PySide6) + engine Python nội bộ (`engine/core` + `engine/api`).
+UI Qt (PySide6) + engine Python nội bộ (`engine/core` + `engine/api`).
 Dán link share → nhận diện → tải.
 
 ![Platform](https://img.shields.io/badge/platform-Windows-blue)
