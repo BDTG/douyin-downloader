@@ -80,7 +80,7 @@ Khi tải báo `FAILED` là do hết cookie:
 | gallery | `:8001` | xem lại theo user |
 | web | `:8080` | `/gallery/` + `/files/` |
 
-## Kiến trúc (100% BDTG)
+## Kiến trúc
 
 ```
 app/ (PySide6)
@@ -89,7 +89,7 @@ app/ (PySide6)
  ├─ localapi.py  → gọi HTTP tới api:8000
  └─ views/       → DouyinPage (resolve/preview/tải)
 
-engine/ (Python, không vendor ngoài)
+engine/ (Python)
  ├─ api/server.py  → FastAPI: resolve/download/jobs/images/user_posts/health
  ├─ core/douyin.py → client Douyin: tách link, resolve short, đọc detail, chọn bản gốc
  ├─ core/storage.py→ lưu downloads/<sec_uid>/<date>_<desc>_<aweme>/ + manifest.jsonl
