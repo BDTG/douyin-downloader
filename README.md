@@ -1,4 +1,4 @@
-# Douyin Downloader — Desktop App (Windows)
+﻿# Douyin Downloader — Desktop App (Windows)
 
 Tải video / ảnh Douyin chất lượng gốc, không watermark — app Windows chạy độc lập.
 
@@ -9,7 +9,7 @@ Dán link share → nhận diện → tải.
 ![Python](https://img.shields.io/badge/python-3.11-blue)
 ![UI](https://img.shields.io/badge/UI-PySide6-green)
 
-## ✨ Tính năng
+## Tính năng
 
 - **Dán cả đoạn share-text** → tự tách link, resolve ra tên / mô tả / độ phân giải /
   thời lượng / ngày đăng / nhạc / lượt xem-like-share
@@ -20,7 +20,7 @@ Dán link share → nhận diện → tải.
 - **Tự quản stack:** mở app tự bật `api:8000 + gallery:8001 + web:8080`, thoát tự tắt
 - **Nhật ký tải** giữ lại sau crash, mất job báo rõ để bấm Tải lại
 
-## 🚀 Cài đặt (người dùng cuối)
+## Cài đặt (người dùng cuối)
 
 Yêu cầu: Windows 10/11 64-bit. Không cần admin, không cần Python.
 
@@ -35,7 +35,7 @@ installer\DouyinDownloader-Setup-1.0.0.exe
 
 > Nâng cấp / gỡ giữ nguyên `cookie + downloads`.
 
-## 🛠 Chạy dev
+## Chạy dev
 
 ```bat
 :: 1. venv app Qt
@@ -60,7 +60,7 @@ Build portable:
 dist\DouyinDownloader\DouyinDownloader.exe
 ```
 
-## ⚙️ Cookie Douyin
+## Cookie Douyin
 
 Khi tải báo `FAILED` là do hết cookie:
 
@@ -70,7 +70,7 @@ Khi tải báo `FAILED` là do hết cookie:
 
 > Cookie là acc chính chủ, nằm ở stack dir, **không commit**.
 
-## 🧭 Cách dùng
+## Cách dùng
 
 1. Copy đoạn share từ Douyin → dán vào app → **Nhận diện**
 2. Xem thông tin + thumbnail → **Tải video** / **Tải ảnh**
@@ -82,7 +82,7 @@ Khi tải báo `FAILED` là do hết cookie:
 | gallery | `:8001` | xem lại theo user |
 | web | `:8080` | `/gallery/` + `/files/` |
 
-## 🏗 Kiến trúc (100% BDTG)
+## Kiến trúc (100% BDTG)
 
 ```
 app/ (PySide6)
@@ -103,13 +103,13 @@ engine/ (Python, không vendor ngoài)
 Nguyên tắc core: chỉ dùng HTTP công khai + cookie người dùng, không dùng
 chữ ký phức tạp, ưu tiên bản gốc không watermark.
 
-## ✅ Test
+## Test
 
 ```bat
 .venv\Scripts\python.exe -m pytest tests/ -q
 ```
 
-## ⚠️ Lưu ý
+## Lưu ý
 
 - Chỉ tải video **của chính bạn / được phép**.
 - Tải lẻ vài link/ngày thì ổn, tải batch phải giãn cách 2-5s/trang tránh checkpoint.
