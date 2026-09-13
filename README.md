@@ -68,8 +68,6 @@ Khi tải báo `FAILED` là do hết cookie:
 2. Copy `ttwid`, `msToken`, `odin_tt`, `passport_csrf_token`
 3. Dán vào `engine/api/config.native.yml` → restart app
 
-> Cookie là acc chính chủ, nằm ở stack dir, **không commit**.
-
 ## Cách dùng
 
 1. Copy đoạn share từ Douyin → dán vào app → **Nhận diện**
